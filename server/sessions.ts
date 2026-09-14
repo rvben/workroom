@@ -604,9 +604,24 @@ export class Sessions {
     if (["pushing", "creating"].includes(s.publication?.state || ""))
       throw new Error("Wait for publication to finish.");
   }
+  ensureTerminalStopped(s: WorkSession) {
+    if (
+      this.store
+        .terminalRuns(this.mode)
+        .some(
+          (run) =>
+            (run.sessionId === s.id || run.worktree === s.worktree) &&
+            run.state !== "stopped",
+        )
+    )
+      throw new Error(
+        "Stop the managed terminal and reconcile its execution before preparing or publishing an MR.",
+      );
+  }
   async preparePublish(id: string, title: string, description: string) {
     const mode = this.mode;
     const s = this.get(id);
+    this.ensureTerminalStopped(s);
     if (
       s.owner !== "human" ||
       !["working", "review", "ready", "blocked"].includes(s.state)
@@ -678,6 +693,7 @@ export class Sessions {
   async publish(id: string, version: number) {
     const mode = this.mode;
     const s = this.get(id);
+    this.ensureTerminalStopped(s);
     const p = s.publication;
     if (
       !p ||

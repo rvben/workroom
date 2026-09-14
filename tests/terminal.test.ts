@@ -103,6 +103,52 @@ test("terminal restart preserves native identity, creates a new attempt, and blo
     f.close();
   }
 });
+test("human handoff cannot prepare or publish an MR until terminal execution is stopped", async () => {
+  const f = await fixture();
+  try {
+    const a = f.terminal.start(f.s.id, { agent: "claude", wrapperPid: 222 });
+    f.terminal.running(a.run.id, a.leaseToken, 223);
+    f.sessions.report(
+      f.s.id,
+      {
+        version: f.sessions.get(f.s.id).version,
+        state: "review",
+        summary: "Implemented",
+        tests: "Assertion passed",
+      },
+      a.leaseToken,
+      false,
+    );
+    f.sessions.handoff(
+      f.s.id,
+      f.sessions.get(f.s.id).version,
+      "human",
+      "Ready for review",
+      a.leaseToken,
+      false,
+    );
+    for (const state of ["launching", "running", "unknown"] as const) {
+      f.store.saveTerminalRun("live", { ...f.terminal.get(a.run.id), state });
+      await assert.rejects(
+        () => f.sessions.preparePublish(f.s.id, "Fix", "Evidence"),
+        /Stop the managed terminal/,
+      );
+      await assert.rejects(
+        () => f.sessions.publish(f.s.id, f.sessions.get(f.s.id).version),
+        /Stop the managed terminal/,
+      );
+    }
+    assert.equal(f.sessions.get(f.s.id).publication, undefined);
+    f.terminal.reconcile(a.run.id);
+    // The terminal guard is now clear; normal publication requirements still apply.
+    await assert.rejects(
+      () => f.sessions.preparePublish(f.s.id, "Fix", "Evidence"),
+      /Enable GitLab/,
+    );
+  } finally {
+    f.close();
+  }
+});
 test("unobserved conversations cannot resume and hook mismatch cannot be relabeled", async () => {
   const f = await fixture();
   try {

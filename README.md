@@ -61,7 +61,7 @@ A live write is prepared as a proposal, explicitly reviewed, and checked against
 
 ## Agent access
 
-See [Integrating coding agents](docs/agents.md) for Codex CLI, Claude Code and Cline CLI examples, including context, leases, progress reports and human handoffs. Workroom has no default coding agent. These examples use the working CLI/API integration; native agent runners are not implemented yet.
+See [Integrating coding agents](docs/agents.md) for Codex CLI, Claude Code and Cline CLI examples, including context, leases, progress reports and human handoffs. Workroom has no default coding agent. Claude Code also has a [managed terminal adapter](docs/terminal-agents.md) for native milestone capture and conversation resume.
 
 ```sh
 npm run agent -- list

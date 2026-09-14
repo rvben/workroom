@@ -50,6 +50,8 @@ npm run agent -- terminal handoff RUN_ID handoff.json
 
 Exit the native CLI normally. Ctrl+C retains its native meaning and can cancel a turn; it is not guaranteed to exit the conversation. When the process exits and the recorded process group is absent, Workroom marks the execution stopped and releases its claim. It preserves the native conversation reference, reports and worktree. It does not automatically complete the task or publish anything.
 
+Human ownership alone does not establish that a managed process has stopped. MR preparation and publication remain blocked while the worktree has a launching, running or unresolved terminal execution. Exit the terminal and, if needed, use the reconciliation action before preparing the MR.
+
 The terminal prints a continuation command, and Workroom offers **Copy resume command · same conversation**:
 
 ```sh
@@ -82,4 +84,6 @@ Recovery verifies the replacement credential, updates that run's private local b
 
 ## Validation and remaining boundary
 
-Automated tests exercise a real local API server, Git branch checks, an executable native-CLI fixture, actual hook subprocesses, two starts with the same native ID, fresh attempts, safe process reconciliation, credential recovery, event deduplication and exclusion of raw input/output. A separate smoke test with the installed Claude CLI validated the generated plugin, completed a model response, exited and resumed the same native ID. The resumed model recalled the earlier synthetic context; both runs delivered native hooks and stopped cleanly. That smoke test used print mode with tools disabled. Interactive terminal behavior and your work machine's trust policies still need a local trial.
+The workflow rehearsal uses a synthetic Jira record, the real local API and Git: preview and create a worktree, preserve a dirty original checkout, make a change through an executable native-CLI fixture, run an assertion, report its result, exit and resume the same native ID, hand back to a human and prepare an MR against the exact local commit. It stops at the preview and verifies that agent credentials cannot execute publication. No remote GitLab project or authenticated agent is needed for this test.
+
+Other tests cover fresh attempts, safe process reconciliation, publication blocked by unresolved terminal runs, credential recovery, event deduplication and exclusion of raw input/output. A separate smoke test with the installed Claude CLI validated the generated plugin, completed a model response, exited and resumed the same native ID. The resumed model recalled the earlier synthetic context; both runs delivered native hooks and stopped cleanly. That smoke test used print mode with tools disabled. Interactive terminal behavior and your work machine's trust policies still need a local trial.
