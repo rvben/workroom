@@ -2101,3 +2101,44 @@ textarea {
 .credential-recovery .button {
   margin: 8px 8px 0 0;
 }
+
+.terminal-work {
+  margin: 28px 0;
+  padding: 24px 0;
+  border-top: 1px solid #dce2dc;
+  min-width: 0;
+}
+.terminal-work h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.terminal-command {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 14px;
+  background: #f0f4ee;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.terminal-run {
+  display: grid;
+  gap: 10px;
+  padding: 22px 0;
+  border-top: 1px solid #dce2dc;
+  margin-top: 22px;
+}
+.terminal-run code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.terminal-run p {
+  margin: 0;
+}
+.terminal-run small {
+  color: #526157;
+}
+.terminal-run .button {
+  justify-self: start;
+}

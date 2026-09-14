@@ -1,44 +1,30 @@
+import { localClient } from "./local-api.js";
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { eventSchema } from "../shared/events.js";
 import { Outbox, fingerprint } from "./outbox.js";
 import { resolve } from "node:path";
 const [command, ...args] = process.argv.slice(2);
-const usage = `Workroom agent CLI\n  sessions | session ID | packet ID\n  claim ID AGENT [CONVERSATION_JSON_FILE] | heartbeat ID\n  report ID JSON_FILE | handoff ID JSON_FILE\n  event ID JSON_FILE | events ID [AFTER_CURSOR]\n  outbox [show ID | hold ID REASON | release ID | rebind SESSION_ID ATTEMPT_ID] | flush [--watch]\n  Events use WORKROOM_ATTEMPT_ID and WORKROOM_REPORT_TOKEN from claim.\n  Set WORKROOM_LEASE_TOKEN to the returned claim token.\n  npm run agent -- list\n  npm run agent -- show ITEM_ID\n  npm run agent -- sync\n  npm run agent -- propose ITEM_ID comment|transition|note BODY\n\nReads the same context as the UI. Proposals require human review in Workroom.`;
+const usage = `Workroom agent CLI\n  terminal start SESSION_ID --agent claude [--resume NATIVE_ID]\n  terminal runs SESSION_ID | reconcile RUN_ID | recover RUN_ID\n  sessions | session ID | packet ID\n  claim ID AGENT [CONVERSATION_JSON_FILE] | heartbeat ID\n  report ID JSON_FILE | handoff ID JSON_FILE\n  event ID JSON_FILE | events ID [AFTER_CURSOR]\n  outbox [show ID | hold ID REASON | release ID | rebind SESSION_ID ATTEMPT_ID] | flush [--watch]\n  Events use WORKROOM_ATTEMPT_ID and WORKROOM_REPORT_TOKEN from claim.\n  Set WORKROOM_LEASE_TOKEN to the returned claim token.\n  npm run agent -- list\n  npm run agent -- show ITEM_ID\n  npm run agent -- sync\n  npm run agent -- propose ITEM_ID comment|transition|note BODY\n\nReads the same context as the UI. Proposals require human review in Workroom.`;
 if (!command || command === "help") {
   console.log(usage);
   process.exit(0);
 }
 const base = process.env.WORKROOM_URL || "http://127.0.0.1:4310";
-const u = new URL(base);
-if (!["localhost", "127.0.0.1"].includes(u.hostname) || u.protocol !== "http:")
-  throw new Error(
-    "This CLI only sends the local token to a loopback Workroom server.",
-  );
-const token = readFileSync(
-  resolve(process.env.WORKROOM_DATA_DIR || ".data", "agent-token"),
-  "utf8",
-).trim();
-async function api(path: string, body?: unknown) {
-  const res = await fetch(base + path, {
-    method: body ? "POST" : "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "X-Workroom-Lease": process.env.WORKROOM_LEASE_TOKEN || "",
-      "X-Workroom-Report": process.env.WORKROOM_REPORT_TOKEN || "",
-    },
-    body: body ? JSON.stringify(body) : undefined,
-    redirect: "error",
-    signal: AbortSignal.timeout(10000),
-  });
-  const data = (await res.json()) as any;
-  if (!res.ok) throw new Error(data.error);
-  return data;
-}
+const client = localClient(
+  resolve(process.env.WORKROOM_DATA_DIR || ".data"),
+  base,
+  process.env.WORKROOM_LEASE_TOKEN,
+  process.env.WORKROOM_REPORT_TOKEN,
+);
+const api = client.api;
+
 try {
   let result;
-  if (["event", "outbox", "flush"].includes(command)) {
+  if (command === "terminal") {
+    const { terminalCommand } = await import("./terminal-cli.js");
+    result = await terminalCommand(args);
+  } else if (["event", "outbox", "flush"].includes(command)) {
     const outbox = new Outbox(
       resolve(process.env.WORKROOM_DATA_DIR || ".data", "agent-outbox.sqlite"),
     );
@@ -53,7 +39,7 @@ try {
             {},
           );
           result = outbox.rebind(
-            fingerprint(base + "\n" + token),
+            client.target,
             args[1],
             args[2],
             fingerprint(process.env.WORKROOM_REPORT_TOKEN),
@@ -74,7 +60,7 @@ try {
           throw new Error(
             "Set WORKROOM_REPORT_TOKEN from the original claim. No reporting credential is stored in the outbox.",
           );
-        const target = fingerprint(base + "\n" + token);
+        const target = client.target;
         const credential = fingerprint(reportToken);
         if (command === "event") {
           if (!args[0] || !args[1])
@@ -89,12 +75,7 @@ try {
           outbox.enqueue(target, credential, args[0], event);
           result = {
             eventId: event.id,
-            ...(await outbox.flush(target, credential, (id, e) =>
-              api(
-                "/api/work/sessions/" + encodeURIComponent(id) + "/events",
-                e,
-              ),
-            )),
+            ...(await outbox.flush(target, credential, client.deliver)),
           };
         } else {
           if (args.length > 1 || (args[0] && args[0] !== "--watch"))
@@ -107,12 +88,7 @@ try {
           process.once("SIGTERM", stop);
           try {
             do {
-              result = await outbox.flush(target, credential, (id, e) =>
-                api(
-                  "/api/work/sessions/" + encodeURIComponent(id) + "/events",
-                  e,
-                ),
-              );
+              result = await outbox.flush(target, credential, client.deliver);
               if (args[0] !== "--watch") {
                 if (result.matchingRemaining) process.exitCode = 1;
                 break;

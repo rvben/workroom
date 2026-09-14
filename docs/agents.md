@@ -2,9 +2,9 @@
 
 Workroom is agent-agnostic. Choose your own installed CLI, provider and model. No coding agent is installed, launched or selected by default.
 
-**Available today:** any agent that can run shell commands can use the included Workroom CLI to read context, report progress and propose updates. The examples below use Codex CLI, Claude Code and Cline CLI.
+**Available today:** any agent that can run shell commands can use the included Workroom CLI to read context, report progress and propose updates. The [managed terminal workflow](terminal-agents.md) adds explicit Claude Code selection, native hook capture and continuation commands. The examples below use Codex CLI, Claude Code and Cline CLI.
 
-**Not implemented yet:** launching agents from the dashboard, streaming their conversations, answering their tool prompts, process cancellation, native protocol adapters and a Workroom MCP server. Handing a session to an agent currently queues work; it does not start a process.
+**Not implemented yet:** launching agents from the dashboard, streaming their conversations, answering their tool prompts, browser process controls, Codex/Cline native adapters and a Workroom MCP server. The terminal wrapper controls its own process group; it does not attach to arbitrary running agents. Handing a session to an agent currently queues work; it does not start a process.
 
 ## Prepare a session
 
@@ -163,7 +163,7 @@ Context and output files in `WORKROOM_RUN_DIR` may contain private source data. 
 
 ## A durable history from any terminal agent
 
-The **Work sessions → Work timeline** view shows an append-only record. Agent events, claim records, full progress-report snapshots and handoffs survive restarts. Existing activity before this feature is not backfilled. The UI checks for received events every ten seconds while visible; this is not terminal process monitoring.
+The **Work sessions → Work timeline** view shows an append-only record. Agent events, claim records, full progress-report snapshots and handoffs survive restarts. Existing activity before this feature is not backfilled. The UI checks for received events every ten seconds while visible. Plain CLI reporting is not process monitoring; managed terminal runs separately report wrapper contact and selected native hooks.
 
 Use events for meaningful milestones: an investigation finding, a decision and its reason, a change with file/commit references, tests with their result, a blocker, or a handoff note. Avoid a noisy event for every token or file read. Never include credentials, unrelated email content or full raw tool output containing secrets. Evidence references are supplied text/links; Workroom does not fetch or verify their contents.
 
@@ -192,7 +192,7 @@ npm --silent --prefix "$WORKROOM_ROOT" run agent -- flush
 npm --silent --prefix "$WORKROOM_ROOT" run agent -- flush --watch
 ```
 
-`flush --watch` retries every ten seconds while the process runs. Stop it with Ctrl+C. It delivers already queued events; it does not watch the agent, generate reports or renew ownership. There is no installed daemon or native agent hook. A plain terminal agent must invoke `event` itself. Future runner/hook adapters can invoke the same contract.
+`flush --watch` retries every ten seconds while the process runs. Stop it with Ctrl+C. It delivers already queued events; it does not watch the agent, generate reports or renew ownership. There is no installed daemon. A plain terminal agent must invoke `event` itself. The opt-in [Claude terminal adapter](terminal-agents.md) adds native hooks and a flush loop for its managed run.
 
 The outbox lives in `WORKROOM_DATA_DIR/agent-outbox.sqlite`, with private file permissions. It stores event bodies and credential fingerprints, not tokens. Delivery is pinned to the original server URL, server authentication token and reporting credential. A flush skips other credentials' events and reports the total pending count. Use each attempt's original environment to flush its queue; changing or losing that credential requires manual recovery. Rejected events remain queued with their error; later events for that credential wait, preserving correction order. Do not delete the outbox to resolve a delivery failure. Tokens must not be embedded in event bodies or evidence.
 
@@ -205,7 +205,7 @@ To inspect a rejected entry, use `outbox show EVENT_ID`. Stop the delivery watch
 - Agent submissions are labeled **Agent-reported**. The server derives the actor and conversation reference from the claim and rejects supplied provenance fields. A Workroom record proves that a claim, report or handoff was recorded; its test-result text is still reported evidence, not independently verified execution.
 - The separate reporting token is append-only and remains valid for historical delivery after lease expiry, handoff or completion. Such events are labeled **Past ownership · history only**. They cannot renew a lease, claim work, mutate status or publish anything. Keep this token private: it retains authority to add history for that attempt. Use **Reporting access & recovery** inside the work session to revoke reporting or replace a lost credential. Replacement immediately invalidates the old token; only the new token is displayed once. These browser-only controls do not change ownership or stop processes. The timeline records each change.
 - `report` and `handoff` still require a current lease and version. Their full historical record is committed atomically with the session change. Heartbeats do not clutter the timeline. An event of kind `blocker` or `handoff` alone does not change state or ownership: use the matching state/report/handoff commands as well.
-- Workroom knows only what it has received. It cannot count another terminal's undelivered queue or infer that an unreported command succeeded. Current visibility is **Reports only**.
+- Workroom knows only what it has received. It cannot count another terminal's undelivered queue or infer that an unreported command succeeded. Plain-agent visibility is **Reports only**; timelines containing adapter events are labeled **Native hooks + reports**.
 
 ### Native conversation references
 
@@ -215,7 +215,7 @@ If you already know the native conversation ID, optionally supply a JSON file as
 { "agent": "your-chosen-cli", "id": "the-native-conversation-id" }
 ```
 
-This reference is persisted with the reporting attempt and its events. It is a reported identity, not a verified native session or an execution controller. A claim's reporting-attempt UUID is distinct from the native conversation ID and Workroom session ID. There is no default agent. For Codex, Claude Code and Cline alike, the event/reporting commands above work when that agent has shell access to Workroom; native automatic event capture remains adapter work.
+This reference is persisted with the reporting attempt and its events. It is a reported identity, not a verified native session or an execution controller. A claim's reporting-attempt UUID is distinct from the native conversation ID and Workroom session ID. There is no default agent. For Codex, Claude Code and Cline alike, the event/reporting commands above work when that agent has shell access to Workroom; native automatic event capture is currently implemented only for the explicit Claude terminal adapter.
 
 ### API and incremental consumers
 

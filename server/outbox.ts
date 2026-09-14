@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, chmodSync } from "node:fs";
 import { dirname } from "node:path";
 import { createHash } from "node:crypto";
+import type { AdapterDelivery } from "../shared/terminal.js";
 import type { EventInput } from "../shared/events.js";
 export const fingerprint = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -23,6 +24,30 @@ export class Outbox {
         .some((r) => r.name === "heldReason")
     )
       this.db.exec("ALTER TABLE pending ADD COLUMN heldReason TEXT DEFAULT ''");
+    if (
+      !this.db
+        .prepare("PRAGMA table_info(pending)")
+        .all()
+        .some((r) => r.name === "transport")
+    )
+      this.db.exec(
+        "ALTER TABLE pending ADD COLUMN transport TEXT DEFAULT 'null'",
+      );
+  }
+  capture(key: string, event: EventInput): EventInput {
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS hook_receipts(key TEXT PRIMARY KEY,payload TEXT)",
+    );
+    this.db
+      .prepare("INSERT OR IGNORE INTO hook_receipts VALUES(?,?)")
+      .run(key, JSON.stringify(event));
+    return JSON.parse(
+      String(
+        this.db
+          .prepare("SELECT payload FROM hook_receipts WHERE key=?")
+          .get(key)!.payload,
+      ),
+    );
   }
   rebind(
     target: string,
@@ -47,7 +72,11 @@ export class Outbox {
       throw new Error(
         "Queued event not found; it may already have been delivered.",
       );
-    return { ...row, heldReason: String(row.heldReason), payload: JSON.parse(String(row.payload)) };
+    return {
+      ...row,
+      heldReason: String(row.heldReason),
+      payload: JSON.parse(String(row.payload)),
+    };
   }
   hold(id: string, reason: string) {
     if (!reason.trim() || reason.length > 500)
@@ -68,13 +97,15 @@ export class Outbox {
     credential: string,
     sessionId: string,
     event: EventInput,
+    delivery?: AdapterDelivery,
   ) {
     const payload = JSON.stringify(event);
+    const transport = JSON.stringify(delivery ?? null);
     this.db.exec("BEGIN IMMEDIATE");
     try {
       this.db
         .prepare(
-          "INSERT OR IGNORE INTO pending(id,target,credential,sessionId,payload,queuedAt) VALUES(?,?,?,?,?,?)",
+          "INSERT OR IGNORE INTO pending(id,target,credential,sessionId,payload,queuedAt,transport) VALUES(?,?,?,?,?,?,?)",
         )
         .run(
           event.id,
@@ -83,6 +114,7 @@ export class Outbox {
           sessionId,
           payload,
           new Date().toISOString(),
+          transport,
         );
       const row = this.db
         .prepare("SELECT * FROM pending WHERE id=?")
@@ -91,7 +123,8 @@ export class Outbox {
         row.target !== target ||
         row.credential !== credential ||
         row.sessionId !== sessionId ||
-        row.payload !== payload
+        row.payload !== payload ||
+        String(row.transport) !== transport
       )
         throw new Error(
           "This queued event ID already has different content. Preserve it and create a correction with a new ID.",
@@ -112,11 +145,15 @@ export class Outbox {
   async flush(
     target: string,
     credential: string,
-    deliver: (sessionId: string, event: EventInput) => Promise<unknown>,
+    deliver: (
+      sessionId: string,
+      event: EventInput,
+      delivery?: AdapterDelivery,
+    ) => Promise<unknown>,
   ) {
     const rows = this.db
       .prepare(
-        "SELECT id,sessionId,payload FROM pending WHERE target=? AND credential=? AND heldReason='' ORDER BY rowid",
+        "SELECT id,sessionId,payload,transport FROM pending WHERE target=? AND credential=? AND heldReason='' ORDER BY rowid",
       )
       .all(target, credential);
     let delivered = 0;
@@ -132,7 +169,11 @@ export class Outbox {
       }
       if (pending.heldReason) continue;
       try {
-        await deliver(String(row.sessionId), JSON.parse(String(row.payload)));
+        await deliver(
+          String(row.sessionId),
+          JSON.parse(String(row.payload)),
+          JSON.parse(String(row.transport)) ?? undefined,
+        );
         this.db.prepare("DELETE FROM pending WHERE id=?").run(row.id);
         delivered++;
       } catch (e) {

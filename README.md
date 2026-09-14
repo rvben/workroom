@@ -169,3 +169,7 @@ Tests also exercise real temporary Git worktrees, dirty checkout preservation, s
 Work sessions include an append-only **Work timeline** with occurrence/receipt times, provenance, evidence references and corrections. Claims return a separate `reportingToken` and `attemptId`; set `WORKROOM_REPORT_TOKEN` and `WORKROOM_ATTEMPT_ID` to use `event SESSION_ID event.json`. The CLI persists events before delivery, and `flush --watch` retries the local queue. Duplicate deliveries are safe. Historical delivery cannot change current ownership or status.
 
 See the [agent reporting guide](docs/agents.md#a-durable-history-from-any-terminal-agent) for schemas, credential handling, offline recovery and the distinction between reporting and process monitoring. No agent executable is selected by default.
+
+### Continue the conversation in terminal
+
+The [managed terminal guide](docs/terminal-agents.md) covers starting a Claude Code conversation from a live work session, native milestone capture, same-ID resume, ownership checks and credential recovery. Agent selection is explicit (`--agent claude`); no executable is selected on the user's behalf in the UI. Codex and Cline retain the generic manual reporting path until their native adapters are implemented.

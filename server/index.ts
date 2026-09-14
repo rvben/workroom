@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { createServer as createViteServer } from "vite";
 import { z } from "zod";
 import { Store } from "./store.js";
+import { TerminalSessions } from "./terminal-sessions.js";
 import { Sessions } from "./sessions.js";
 import { suggestBranch } from "./git.js";
 import { Service } from "./service.js";
@@ -19,6 +20,7 @@ const browserToken = randomBytes(32).toString("hex");
 const store = new Store(resolve(dataDir, "workroom.sqlite"));
 const service = new Service(store);
 const sessions = new Sessions(service);
+const terminal = new TerminalSessions(sessions);
 const app = express();
 const port = Number(process.env.PORT || 4310);
 app.disable("x-powered-by");
@@ -143,6 +145,51 @@ app.post("/api/work/sessions/:id/claim", (req, res) =>
       String(req.params.id),
       z.string().trim().min(1).max(100).parse(req.body.agent),
       req.body.conversation,
+    ),
+  ),
+);
+app.get("/api/work/sessions/:id/terminal", (req, res) =>
+  res.json(terminal.list(String(req.params.id))),
+);
+app.post("/api/work/sessions/:id/terminal", (req, res) =>
+  res.json(terminal.start(String(req.params.id), req.body)),
+);
+app.get("/api/terminal/:id", (req, res) =>
+  res.json(terminal.get(String(req.params.id))),
+);
+app.post("/api/terminal/:id/running", (req, res) =>
+  res.json(
+    terminal.running(
+      String(req.params.id),
+      lease(req),
+      z.number().int().min(2).parse(req.body.childPid),
+    ),
+  ),
+);
+app.post("/api/terminal/:id/check", (req, res) =>
+  res.json(terminal.check(String(req.params.id), lease(req))),
+);
+app.post("/api/terminal/:id/heartbeat", (req, res) =>
+  res.json(terminal.heartbeat(String(req.params.id), lease(req))),
+);
+app.post("/api/terminal/:id/finish", (req, res) =>
+  res.json(
+    terminal.finish(
+      String(req.params.id),
+      String(req.headers["x-workroom-report"] || ""),
+      z.number().int().nullable().parse(req.body.exitCode),
+    ),
+  ),
+);
+app.post("/api/terminal/:id/reconcile", (req, res) =>
+  res.json(terminal.reconcile(String(req.params.id))),
+);
+app.post("/api/terminal/:id/events", (req, res) =>
+  res.json(
+    terminal.capture(
+      String(req.params.id),
+      req.body,
+      String(req.headers["x-workroom-report"] || ""),
     ),
   ),
 );

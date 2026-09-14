@@ -7,6 +7,7 @@ import {
   UserRound,
   Bot,
 } from "lucide-react";
+import { TerminalWork } from "./terminal-work";
 import { ReportingCredentials } from "./reporting-access";
 import { WorkTimeline } from "./timeline";
 import { api } from "./api";
@@ -506,6 +507,7 @@ function SessionEditor({
           <p>{s.nextAction}</p>
         </div>
       )}
+      <TerminalWork session={s} mode={mode} />
       <WorkTimeline key={s.id} sessionId={s.id} />
       <ReportingCredentials key={"access:" + s.id} sessionId={s.id} />
       {!terminal && (

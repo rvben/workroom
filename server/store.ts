@@ -16,6 +16,7 @@ import type {
   ReportingAttempt,
   EventPage,
 } from "../shared/events.js";
+import type { TerminalRun } from "../shared/terminal.js";
 export class Store {
   db: DatabaseSync;
   constructor(path: string) {
@@ -32,6 +33,8 @@ export class Store {
       CREATE TABLE IF NOT EXISTS proposals(mode TEXT,id TEXT,data TEXT,PRIMARY KEY(mode,id));
       CREATE TABLE IF NOT EXISTS sessions(mode TEXT,id TEXT,itemId TEXT,state TEXT,version INTEGER,data TEXT,claimHash TEXT DEFAULT '',PRIMARY KEY(mode,id));
       CREATE UNIQUE INDEX IF NOT EXISTS active_session ON sessions(mode,itemId) WHERE state NOT IN ('completed','failed');
+      CREATE TABLE IF NOT EXISTS terminal_runs(mode TEXT,id TEXT,sessionId TEXT,worktree TEXT,state TEXT,data TEXT,PRIMARY KEY(mode,id));
+      CREATE UNIQUE INDEX IF NOT EXISTS terminal_writer ON terminal_runs(mode,worktree) WHERE state IN ('launching','running','unknown');
       CREATE TABLE IF NOT EXISTS reporting_attempts(mode TEXT,id TEXT,sessionId TEXT,data TEXT,PRIMARY KEY(mode,id));
       CREATE TABLE IF NOT EXISTS work_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,mode TEXT,id TEXT,sessionId TEXT,data TEXT,UNIQUE(mode,id));
       CREATE INDEX IF NOT EXISTS session_events ON work_events(mode,sessionId,sequence);
@@ -240,6 +243,34 @@ export class Store {
     this.db
       .prepare("INSERT INTO reporting_attempts VALUES (?,?,?,?)")
       .run(mode, attempt.id, attempt.sessionId, JSON.stringify(attempt));
+  }
+  terminalRuns(mode: Mode): TerminalRun[] {
+    return this.db
+      .prepare(
+        "SELECT data FROM terminal_runs WHERE mode=? ORDER BY rowid DESC",
+      )
+      .all(mode)
+      .map((row) => JSON.parse(String(row.data)));
+  }
+  terminalRun(mode: Mode, id: string): TerminalRun | undefined {
+    const row = this.db
+      .prepare("SELECT data FROM terminal_runs WHERE mode=? AND id=?")
+      .get(mode, id);
+    return row ? JSON.parse(String(row.data)) : undefined;
+  }
+  saveTerminalRun(mode: Mode, run: TerminalRun) {
+    this.db
+      .prepare(
+        "INSERT INTO terminal_runs VALUES(?,?,?,?,?,?) ON CONFLICT(mode,id) DO UPDATE SET state=excluded.state,data=excluded.data",
+      )
+      .run(
+        mode,
+        run.id,
+        run.sessionId,
+        run.worktree,
+        run.state,
+        JSON.stringify(run),
+      );
   }
   updateAttempt(mode: Mode, attempt: ReportingAttempt) {
     this.db

@@ -85,7 +85,7 @@ export function WorkTimeline({ sessionId }: { sessionId: string }) {
   );
   const last = [...events]
     .sort((a, b) => b.sequence - a.sequence)
-    .find((e) => e.source === "agent" || e.kind === "report");
+    .find((e) => e.source !== "workroom" || e.kind === "report");
   return (
     <section className="work-timeline" aria-label="Work timeline">
       <div className="timeline-heading">
@@ -94,7 +94,10 @@ export function WorkTimeline({ sessionId }: { sessionId: string }) {
             <Clock3 size={18} /> Work timeline
           </h3>
           <p>
-            Reports only ·{" "}
+            {events.some((e) => e.source === "adapter")
+              ? "Native hooks + reports"
+              : "Reports only"}{" "}
+            ·{" "}
             {last
               ? `Last received ${date(last.receivedAt)}`
               : "No progress reports in loaded history"}
@@ -111,8 +114,8 @@ export function WorkTimeline({ sessionId }: { sessionId: string }) {
         </button>
       </div>
       <p className="timeline-caption">
-        Reports record what was shared. Terminal activity and queued reports are
-        not automatically visible.
+        Reports record what was shared. Only connected adapters capture terminal
+        milestones; queued reports remain local until delivered.
       </p>
       {error && (
         <p className="alert" role="alert">
@@ -158,7 +161,9 @@ export function WorkTimeline({ sessionId }: { sessionId: string }) {
                       {e.actor} ·{" "}
                       {e.source === "agent"
                         ? "Agent-reported"
-                        : "Workroom record"}
+                        : e.source === "adapter"
+                          ? "Adapter-reported"
+                          : "Workroom record"}
                     </span>
                     <time dateTime={e.occurredAt}>
                       Occurred {date(e.occurredAt)}
@@ -205,8 +210,8 @@ export function WorkTimeline({ sessionId }: { sessionId: string }) {
                     <dl>
                       <dt>
                         Occurred{" "}
-                        {e.source === "agent"
-                          ? "(agent clock)"
+                        {e.source !== "workroom"
+                          ? "(reporter clock)"
                           : "(Workroom clock)"}
                       </dt>
                       <dd>{date(e.occurredAt)}</dd>

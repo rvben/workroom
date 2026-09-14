@@ -270,6 +270,18 @@ export class Sessions {
       throw new Error(
         `Already claimed by ${s.leaseOwner}. Wait for release or lease expiry.`,
       );
+    if (
+      this.store
+        .terminalRuns(this.mode)
+        .some(
+          (r) =>
+            (r.sessionId === id || r.worktree === s.worktree) &&
+            r.state !== "stopped",
+        )
+    )
+      throw new Error(
+        "A terminal run still owns this worktree. Stop or reconcile it before claiming again.",
+      );
     const token = randomBytes(32).toString("hex");
     s.leaseOwner = agent;
     s.leaseExpiresAt = new Date(Date.now() + 15 * 60000).toISOString();
@@ -526,7 +538,12 @@ export class Sessions {
     this.get(id);
     return this.store.events(this.mode, id, after, limit, before);
   }
-  event(id: string, input: unknown, token: string) {
+  event(
+    id: string,
+    input: unknown,
+    token: string,
+    source: "agent" | "adapter" = "agent",
+  ) {
     const x = eventSchema.parse(input);
     const s = this.get(id);
     const attempt = this.reportingAttempt(id, x.attemptId, token);
@@ -535,7 +552,7 @@ export class Sessions {
       const original = eventSchema.parse(oldEventInput(old));
       if (
         old.sessionId !== id ||
-        old.source !== "agent" ||
+        old.source !== source ||
         JSON.stringify(original) !== JSON.stringify(x)
       )
         throw new Error(
@@ -569,7 +586,7 @@ export class Sessions {
       sessionId: id,
       actor: attempt.actor,
       receivedAt: new Date().toISOString(),
-      source: "agent",
+      source,
       conversation: attempt.conversation,
       historical,
     });

@@ -15,6 +15,9 @@ export const eventSchema = z
       "blocker",
       "handoff",
       "correction",
+      "session",
+      "tool",
+      "turn",
     ]),
     summary: z.string().trim().min(1).max(500),
     detail: z.string().max(15000).default(""),
@@ -49,7 +52,7 @@ export interface WorkEvent extends Omit<EventInput, "attemptId" | "kind"> {
   sessionId: string;
   receivedAt: string;
   actor: string;
-  source: "agent" | "workroom";
+  source: "agent" | "workroom" | "adapter";
   conversation: { agent: string; id: string } | null;
   historical: boolean;
 }
