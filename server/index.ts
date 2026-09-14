@@ -146,6 +146,37 @@ app.post("/api/work/sessions/:id/claim", (req, res) =>
     ),
   ),
 );
+app.get("/api/work/sessions/:id/reporting", (req, res) =>
+  res.json(sessions.reportingAccess(String(req.params.id))),
+);
+app.post("/api/work/sessions/:id/reporting/:attemptId/verify", (req, res) => {
+  sessions.reportingAttempt(
+    String(req.params.id),
+    String(req.params.attemptId),
+    String(req.headers["x-workroom-report"] || ""),
+  );
+  res.json({ valid: true });
+});
+app.post(
+  "/api/work/sessions/:id/reporting/:attemptId/:action",
+  browserOnly,
+  (req, res) => {
+    const action = z.enum(["rotate", "revoke"]).parse(req.params.action);
+    const version = z
+      .number()
+      .int()
+      .positive()
+      .parse(req.body.credentialVersion);
+    res.json(
+      sessions.manageReporting(
+        String(req.params.id),
+        String(req.params.attemptId),
+        action,
+        version,
+      ),
+    );
+  },
+);
 app.get("/api/work/sessions/:id/events", (req, res) => {
   const after = z.coerce
     .number()

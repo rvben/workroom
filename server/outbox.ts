@@ -24,6 +24,19 @@ export class Outbox {
     )
       this.db.exec("ALTER TABLE pending ADD COLUMN heldReason TEXT DEFAULT ''");
   }
+  rebind(
+    target: string,
+    sessionId: string,
+    attemptId: string,
+    credential: string,
+  ) {
+    const changed = this.db
+      .prepare(
+        "UPDATE pending SET credential=?,lastError='' WHERE target=? AND sessionId=? AND json_extract(payload,'$.attemptId')=?",
+      )
+      .run(credential, target, sessionId, attemptId);
+    return { rebound: Number(changed.changes) };
+  }
   inspect(id: string) {
     const row = this.db
       .prepare(
@@ -34,7 +47,7 @@ export class Outbox {
       throw new Error(
         "Queued event not found; it may already have been delivered.",
       );
-    return { ...row, payload: JSON.parse(String(row.payload)) };
+    return { ...row, heldReason: String(row.heldReason), payload: JSON.parse(String(row.payload)) };
   }
   hold(id: string, reason: string) {
     if (!reason.trim() || reason.length > 500)

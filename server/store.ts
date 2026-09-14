@@ -241,6 +241,19 @@ export class Store {
       .prepare("INSERT INTO reporting_attempts VALUES (?,?,?,?)")
       .run(mode, attempt.id, attempt.sessionId, JSON.stringify(attempt));
   }
+  updateAttempt(mode: Mode, attempt: ReportingAttempt) {
+    this.db
+      .prepare("UPDATE reporting_attempts SET data=? WHERE mode=? AND id=?")
+      .run(JSON.stringify(attempt), mode, attempt.id);
+  }
+  attempts(mode: Mode, sessionId: string): ReportingAttempt[] {
+    return this.db
+      .prepare(
+        "SELECT data FROM reporting_attempts WHERE mode=? AND sessionId=? ORDER BY rowid DESC",
+      )
+      .all(mode, sessionId)
+      .map((row) => JSON.parse(String(row.data)));
+  }
   attempt(mode: Mode, id: string): ReportingAttempt | undefined {
     const row = this.db
       .prepare("SELECT data FROM reporting_attempts WHERE mode=? AND id=?")
@@ -288,12 +301,10 @@ export class Store {
         `SELECT sequence,data FROM work_events WHERE mode=? AND sessionId=? AND sequence${before === undefined ? ">" : "<"}? ORDER BY sequence ${before === undefined ? "ASC" : "DESC"} LIMIT ?`,
       )
       .all(mode, sessionId, before ?? after, limit + 1);
-    const events = rows
-      .slice(0, limit)
-      .map((row) => ({
-        ...JSON.parse(String(row.data)),
-        sequence: Number(row.sequence),
-      })) as WorkEvent[];
+    const events = rows.slice(0, limit).map((row) => ({
+      ...JSON.parse(String(row.data)),
+      sequence: Number(row.sequence),
+    })) as WorkEvent[];
     return {
       events,
       nextCursor: events.at(-1)?.sequence ?? before ?? after,

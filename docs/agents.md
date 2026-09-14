@@ -203,7 +203,7 @@ To inspect a rejected entry, use `outbox show EVENT_ID`. Stop the delivery watch
 - Each event retains its occurrence time and server receipt time. Receipt sequence is the stable pagination cursor; a late event cannot disappear behind a time-based cursor. The UI can sort by either clock and labels delayed delivery.
 - Re-delivering the same ID and normalized content returns the original event. Reusing that ID with different content fails. Corrections use a new UUID, `kind: "correction"`, and `corrects: "original-event-uuid"`; the original stays visible. Corrections are restricted to that attempt's own agent events.
 - Agent submissions are labeled **Agent-reported**. The server derives the actor and conversation reference from the claim and rejects supplied provenance fields. A Workroom record proves that a claim, report or handoff was recorded; its test-result text is still reported evidence, not independently verified execution.
-- The separate reporting token is append-only and remains valid for historical delivery after lease expiry, handoff or completion. Such events are labeled **Past ownership · history only**. They cannot renew a lease, claim work, mutate status or publish anything. Keep this token private: it retains authority to add history for that attempt. Reporting-token rotation/revocation controls are not implemented yet.
+- The separate reporting token is append-only and remains valid for historical delivery after lease expiry, handoff or completion. Such events are labeled **Past ownership · history only**. They cannot renew a lease, claim work, mutate status or publish anything. Keep this token private: it retains authority to add history for that attempt. Use **Reporting access & recovery** inside the work session to revoke reporting or replace a lost credential. Replacement immediately invalidates the old token; only the new token is displayed once. These browser-only controls do not change ownership or stop processes. The timeline records each change.
 - `report` and `handoff` still require a current lease and version. Their full historical record is committed atomically with the session change. Heartbeats do not clutter the timeline. An event of kind `blocker` or `handoff` alone does not change state or ownership: use the matching state/report/handoff commands as well.
 - Workroom knows only what it has received. It cannot count another terminal's undelivered queue or infer that an unreported command succeeded. Current visibility is **Reports only**.
 
@@ -239,3 +239,15 @@ These are proposed implementation choices, not configuration options that Workro
 Codex documents its own [App Server protocol](https://learn.chatgpt.com/docs/app-server); Claude provides an [Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview); Cline documents [ACP](https://docs.cline.bot/usage/acp). Do not assume their wire formats or capabilities are interchangeable. A future Workroom runner should let users explicitly select an executable and adapter, verify its installed capabilities, own lease renewal and map cancellation to actual process state.
 
 CLI examples were checked against official documentation on 2026-09-14 and the included Workroom CLI contract. They have not been run against authenticated agent providers. Confirm options with your installed CLI's help, especially for older versions.
+
+### Recover a lost or revoked reporting credential
+
+Open **Work sessions → Reporting access & recovery**. Choose **Replace token**, or **Restore with new token** for a revoked attempt. Copy the replacement into the original terminal's `WORKROOM_REPORT_TOKEN` environment variable. Stop any running flush watcher first. Then run:
+
+```sh
+npm --silent --prefix "$WORKROOM_ROOT" run agent -- outbox rebind \
+  "$WORKROOM_SESSION_ID" "$WORKROOM_ATTEMPT_ID"
+npm --silent --prefix "$WORKROOM_ROOT" run agent -- flush
+```
+
+Rebinding first verifies the replacement credential with the original Workroom server. Only pending entries for that server, session and attempt are rebound, including held entries; IDs, timestamps, payloads and hold reasons remain intact. Revocation rejects even duplicate event delivery until access is restored. Existing server history is never removed. Lost lease credentials are separate: reporting recovery cannot grant permission to edit or regain ownership.

@@ -456,6 +456,72 @@ export class Sessions {
         : null,
     });
   }
+  reportingAccess(id: string) {
+    this.get(id);
+    return this.store
+      .attempts(this.mode, id)
+      .map(({ reportHash, leaseHash, ...attempt }) => ({
+        ...attempt,
+        credentialVersion: attempt.credentialVersion ?? 1,
+        status: attempt.revokedAt ? ("revoked" as const) : ("active" as const),
+      }));
+  }
+  reportingAttempt(id: string, attemptId: string, token: string) {
+    this.get(id);
+    const attempt = this.store.attempt(this.mode, attemptId);
+    if (
+      !attempt ||
+      attempt.sessionId !== id ||
+      attempt.revokedAt ||
+      !token ||
+      attempt.reportHash !== digest(token)
+    )
+      throw new Error(
+        "Reporting credential is revoked or does not match this session and attempt.",
+      );
+    return attempt;
+  }
+  manageReporting(
+    id: string,
+    attemptId: string,
+    action: "rotate" | "revoke",
+    version: number,
+  ) {
+    const s = this.get(id);
+    return this.store.transaction(() => {
+      const attempt = this.store.attempt(this.mode, attemptId);
+      if (!attempt || attempt.sessionId !== id)
+        throw new Error("Reporting attempt not found.");
+      if ((attempt.credentialVersion ?? 1) !== version)
+        throw new Error(
+          "Reporting access changed. Reload before trying again.",
+        );
+      if (action === "revoke" && attempt.revokedAt)
+        throw new Error("Reporting access is already revoked.");
+      const reportingToken =
+        action === "rotate" ? randomBytes(32).toString("hex") : undefined;
+      const now = new Date().toISOString();
+      attempt.reportHash = reportingToken ? digest(reportingToken) : "";
+      attempt.credentialVersion = version + 1;
+      attempt.revokedAt = action === "revoke" ? now : "";
+      if (action === "rotate") attempt.rotatedAt = now;
+      this.store.updateAttempt(this.mode, attempt);
+      this.record(
+        s,
+        "credential",
+        action === "rotate"
+          ? "Reporting credential replaced"
+          : "Reporting access revoked",
+        `Attempt ${attempt.id}. ${action === "rotate" ? "Previous credential no longer accepted. Rebind pending events with the replacement." : "Existing history preserved. New event delivery is disabled for this attempt."} Work ownership is unchanged.`,
+        "You",
+        attempt.id,
+      );
+      return {
+        access: this.reportingAccess(id).find((a) => a.id === attemptId)!,
+        ...(reportingToken ? { reportingToken } : {}),
+      };
+    });
+  }
   events(id: string, after = 0, limit = 100, before?: number) {
     this.get(id);
     return this.store.events(this.mode, id, after, limit, before);
@@ -463,16 +529,7 @@ export class Sessions {
   event(id: string, input: unknown, token: string) {
     const x = eventSchema.parse(input);
     const s = this.get(id);
-    const attempt = this.store.attempt(this.mode, x.attemptId);
-    if (
-      !attempt ||
-      attempt.sessionId !== id ||
-      !token ||
-      attempt.reportHash !== digest(token)
-    )
-      throw new Error(
-        "Reporting credential does not match this session and attempt.",
-      );
+    const attempt = this.reportingAttempt(id, x.attemptId, token);
     const old = this.store.event(this.mode, x.id);
     if (old) {
       const original = eventSchema.parse(oldEventInput(old));

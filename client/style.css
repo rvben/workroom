@@ -2066,3 +2066,38 @@ textarea {
 .session-editor .timeline-order select {
   width: auto;
 }
+
+.reporting-access {
+  margin: 24px 0;
+  overflow-wrap: anywhere;
+}
+.reporting-access > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.reporting-access p {
+  max-width: 70ch;
+}
+.reporting-access-row {
+  display: grid;
+  gap: 8px;
+  padding: 18px 0;
+  border-bottom: 1px solid #dce2dc;
+}
+.reporting-access-row small {
+  color: #526157;
+}
+.reporting-access-row code,
+.recovery-command {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.credential-recovery {
+  padding: 16px;
+  background: #edf1e9;
+  margin: 16px 0;
+}
+.credential-recovery .button {
+  margin: 8px 8px 0 0;
+}

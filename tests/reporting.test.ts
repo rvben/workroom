@@ -377,3 +377,80 @@ test("holding a rejected event preserves its body and allows independent deliver
     outbox.close();
   }
 });
+
+test("reporting revocation and rotation reject old credentials and preserve history and ownership", async () => {
+  const f = await fixture();
+  try {
+    const input = f.event();
+    f.sessions.event(f.s.id, input, f.claim.reportingToken);
+    const before = f.sessions.get(f.s.id);
+    const listed = f.sessions.reportingAccess(f.s.id)[0];
+    assert.equal("reportHash" in listed, false);
+    assert.equal("leaseHash" in listed, false);
+    f.sessions.manageReporting(f.s.id, f.claim.attemptId, "revoke", 1);
+    assert.throws(
+      () => f.sessions.event(f.s.id, input, f.claim.reportingToken),
+      /revoked/,
+    );
+    assert.throws(
+      () => f.sessions.manageReporting(f.s.id, f.claim.attemptId, "rotate", 1),
+      /changed/,
+    );
+    const replacement = f.sessions.manageReporting(
+      f.s.id,
+      f.claim.attemptId,
+      "rotate",
+      2,
+    );
+    assert.ok(replacement.reportingToken);
+    assert.equal(
+      f.sessions.event(f.s.id, input, replacement.reportingToken).duplicate,
+      true,
+    );
+    assert.throws(
+      () => f.sessions.event(f.s.id, f.event(), f.claim.reportingToken),
+      /credential/,
+    );
+    assert.deepEqual(f.sessions.get(f.s.id), before);
+    assert.equal(
+      f.sessions.events(f.s.id).events.filter((e) => e.kind === "credential")
+        .length,
+      2,
+    );
+  } finally {
+    f.store.close();
+  }
+});
+
+test("queue credential recovery changes only the verified target and attempt and retains held content", async () => {
+  const f = await fixture(),
+    outbox = new Outbox(":memory:");
+  try {
+    const input = f.event(),
+      other = f.event({ attemptId: randomUUID() });
+    outbox.enqueue("target", "old", f.s.id, input);
+    outbox.enqueue("target", "old", f.s.id, other);
+    outbox.hold(input.id, "Review evidence");
+    assert.equal(
+      outbox.rebind("different-server", f.s.id, f.claim.attemptId, "new")
+        .rebound,
+      0,
+    );
+    assert.equal(
+      outbox.rebind("target", f.s.id, f.claim.attemptId, "new").rebound,
+      1,
+    );
+    assert.deepEqual(outbox.inspect(input.id).payload, input);
+    assert.equal(outbox.inspect(input.id).heldReason, "Review evidence");
+    outbox.release(input.id);
+    const sent: string[] = [];
+    await outbox.flush("target", "new", async (_id, e) => {
+      sent.push(e.id);
+    });
+    assert.deepEqual(sent, [input.id]);
+    assert.equal(outbox.status().length, 1);
+  } finally {
+    f.store.close();
+    outbox.close();
+  }
+});

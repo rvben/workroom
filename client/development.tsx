@@ -7,6 +7,7 @@ import {
   UserRound,
   Bot,
 } from "lucide-react";
+import { ReportingCredentials } from "./reporting-access";
 import { WorkTimeline } from "./timeline";
 import { api } from "./api";
 import { mrSignals } from "../shared/mrs";
@@ -506,6 +507,7 @@ function SessionEditor({
         </div>
       )}
       <WorkTimeline key={s.id} sessionId={s.id} />
+      <ReportingCredentials key={"access:" + s.id} sessionId={s.id} />
       {!terminal && (
         <>
           <h3>Progress & evidence</h3>

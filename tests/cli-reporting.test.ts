@@ -93,6 +93,18 @@ test(
         base + `/api/work/sessions/${s.id}/events`,
       );
       assert.equal(unauthorized.status, 401);
+      const unauthorizedRotation = await fetch(
+        base + `/api/work/sessions/${s.id}/reporting/${claim.attemptId}/rotate`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ credentialVersion: 1 }),
+        },
+      );
+      assert.equal(unauthorizedRotation.status, 403);
       const flushed = await cli("flush");
       assert.equal(flushed.remaining, 0);
       assert.equal(flushed.delivered, 1);

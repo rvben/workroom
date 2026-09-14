@@ -44,7 +44,7 @@ export const eventSchema = z
 export type EventInput = z.infer<typeof eventSchema>;
 export interface WorkEvent extends Omit<EventInput, "attemptId" | "kind"> {
   attemptId: string | null;
-  kind: EventInput["kind"] | "claim" | "report";
+  kind: EventInput["kind"] | "claim" | "report" | "credential";
   sequence: number;
   sessionId: string;
   receivedAt: string;
@@ -72,4 +72,15 @@ export interface ReportingAttempt {
   conversation: z.infer<typeof conversationSchema> | null;
   reportHash: string;
   leaseHash: string;
+  credentialVersion?: number;
+  revokedAt?: string;
+  rotatedAt?: string;
 }
+
+export type ReportingAccess = Omit<
+  ReportingAttempt,
+  "reportHash" | "leaseHash"
+> & {
+  credentialVersion: number;
+  status: "active" | "revoked";
+};
