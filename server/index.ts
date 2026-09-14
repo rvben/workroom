@@ -9,6 +9,7 @@ import { TerminalSessions } from "./terminal-sessions.js";
 import { Sessions } from "./sessions.js";
 import { suggestBranch } from "./git.js";
 import { Service } from "./service.js";
+import { Onboarding } from "./onboarding.js";
 import { SOURCES } from "../shared/types.js";
 const dataDir = resolve(process.env.WORKROOM_DATA_DIR || ".data");
 mkdirSync(dataDir, { recursive: true, mode: 0o700 });
@@ -19,6 +20,7 @@ const agentToken = readFileSync(tokenPath, "utf8").trim();
 const browserToken = randomBytes(32).toString("hex");
 const store = new Store(resolve(dataDir, "workroom.sqlite"));
 const service = new Service(store);
+const onboarding = new Onboarding(service);
 const sessions = new Sessions(service);
 const terminal = new TerminalSessions(sessions);
 const app = express();
@@ -117,6 +119,28 @@ const browserOnly: express.RequestHandler = (_req, res, next) => {
 };
 const lease = (req: express.Request) =>
   String(req.headers["x-workroom-lease"] || "");
+app.get("/api/setup", browserOnly, (_req, res) =>
+  res.json(onboarding.overview()),
+);
+app.post("/api/setup/state", browserOnly, (req, res) =>
+  res.json(onboarding.save(req.body)),
+);
+app.post("/api/setup/check", browserOnly, async (_req, res) =>
+  res.json(await onboarding.check()),
+);
+app.post("/api/setup/verify/:source", browserOnly, async (req, res) =>
+  res.json(await onboarding.verify(z.enum(SOURCES).parse(req.params.source))),
+);
+app.post("/api/setup/install", browserOnly, async (req, res) =>
+  res.json(await onboarding.install(req.body)),
+);
+app.post("/api/setup/repository/:id", browserOnly, async (req, res) =>
+  res.json(await onboarding.repository(String(req.params.id))),
+);
+app.post("/api/setup/finish", browserOnly, async (_req, res) =>
+  res.json(await onboarding.finish(z.number().int().parse(_req.body.version))),
+);
+
 app.get("/api/work/options", (req, res) => {
   const item = store.item(service.mode, String(req.query.itemId));
   res.json({

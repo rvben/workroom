@@ -24,6 +24,8 @@ The server binds to loopback only. Run it under the same OS account and environm
 
 ## Connect your work tools
 
+Open **Connections → Guided setup** to detect and install missing CLIs, verify source access, choose agents explicitly and register local repositories. See the [onboarding guide](docs/onboarding.md) for installation methods, sign-in and recovery.
+
 Install and sign in to `jira`, `glab`, `servicenow` and `outlook` separately using their normal setup flows. Workroom reuses their profiles and credential storage; it does not collect tokens or passwords.
 
 1. Open **Connections**.

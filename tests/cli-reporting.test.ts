@@ -105,6 +105,28 @@ test(
         },
       );
       assert.equal(unauthorizedRotation.status, 403);
+      for (const path of [
+        "state",
+        "check",
+        "verify/jira",
+        "install",
+        "finish",
+        "repository/test",
+      ]) {
+        const denied = await fetch(base + "/api/setup/" + path, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            tool: "jira",
+            installer: "uv",
+            confirmed: true,
+          }),
+        });
+        assert.equal(denied.status, 403);
+      }
       const flushed = await cli("flush");
       assert.equal(flushed.remaining, 0);
       assert.equal(flushed.delivered, 1);

@@ -1,3 +1,4 @@
+import { Onboarding, SetupInvitation } from "./onboarding";
 import {
   MrWorkspace,
   SessionWorkspace,
@@ -119,6 +120,7 @@ function App() {
       "Agent desk",
       "Activity",
       "Connections",
+      "Setup",
     ].includes(route)
       ? route
       : "Attention";
@@ -352,12 +354,21 @@ function App() {
                 <LoaderCircle className="spin" />
                 Opening your workspace…
               </div>
+            ) : view === "Setup" ? (
+              <Onboarding
+                finish={(next) => {
+                  setSnapshot(next);
+                  void navigate("Attention");
+                }}
+                exit={() => void navigate("Connections")}
+              />
             ) : view === "Connections" ? (
               <Connections
                 settings={settings}
                 snapshot={snapshot}
                 refresh={refresh}
                 refreshing={refreshing}
+                setup={() => void navigate("Setup")}
                 save={async (s) => {
                   try {
                     const next = await api<Settings>("/settings", "PUT", s);
@@ -394,6 +405,9 @@ function App() {
               <ActivityView mode={snapshot.mode} />
             ) : (
               <>
+                {view === "Attention" && (
+                  <SetupInvitation open={() => void navigate("Setup")} />
+                )}
                 <div className="page-heading">
                   <div>
                     <h1>
@@ -1467,12 +1481,14 @@ function AgentDesk({
   );
 }
 function Connections({
+  setup,
   settings,
   snapshot,
   refresh,
   refreshing,
   save,
 }: {
+  setup: () => void;
   settings?: Settings;
   snapshot: Snapshot;
   refresh: (s?: Source) => Promise<void>;
@@ -1505,23 +1521,28 @@ function Connections({
           <h1>Your tools, together.</h1>
           <p>Use the CLIs already authenticated on this work machine.</p>
         </div>
-        <button
-          className="button primary"
-          disabled={saving || refreshing}
-          onClick={async () => {
-            setSaving(true);
-            setError("");
-            try {
-              await save(draft);
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setSaving(false);
-            }
-          }}
-        >
-          {saving ? "Saving…" : "Save connections"}
-        </button>
+        <div className="setup-heading-actions">
+          <button className="button" onClick={setup}>
+            Guided setup <ArrowRight size={15} />
+          </button>
+          <button
+            className="button primary"
+            disabled={saving || refreshing}
+            onClick={async () => {
+              setSaving(true);
+              setError("");
+              try {
+                await save(draft);
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving ? "Saving…" : "Save connections"}
+          </button>
+        </div>
       </div>
       {error && (
         <div className="alert" role="alert">

@@ -61,6 +61,7 @@ export interface Settings {
   refreshMinutes: number;
   connectors: Record<Source, ConnectorConfig>;
   development?: DevelopmentSettings;
+  agents?: { enabled: import("./onboarding.js").AgentId[] };
 }
 export interface Proposal {
   id: string;

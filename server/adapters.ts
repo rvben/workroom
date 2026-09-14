@@ -1,5 +1,6 @@
 import { projectParts } from "../shared/mrs.js";
 import { execFile } from "node:child_process";
+import { resolveCommand } from "./tool-process.js";
 import type {
   Source,
   ConnectorConfig,
@@ -24,7 +25,7 @@ export const run: Runner = (exe, args, write = false) =>
   new Promise((resolve, reject) => {
     // No shell, no command strings, no credentials in diagnostics.
     const child = execFile(
-      exe,
+      resolveCommand(exe),
       args,
       {
         timeout: 45_000,

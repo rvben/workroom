@@ -47,6 +47,9 @@ export const developmentSchema = z.object({
 });
 export const settingsSchema = z.object({
   mode: z.enum(["live", "demo"]),
+  agents: z
+    .object({ enabled: z.array(z.enum(["codex", "claude", "cline"])).max(3) })
+    .default({ enabled: [] }),
   development: developmentSchema.default({ repositories: [], teamMembers: [] }),
   refreshMinutes: z.number().int().min(1).max(120),
   connectors: z.object({
@@ -150,6 +153,10 @@ export class Service {
     };
   }
   saveSettings(value: unknown) {
+    if (this.store.terminalRuns(this.mode).some((r) => r.state !== "stopped"))
+      throw new Error(
+        "Stop or reconcile active terminal runs before changing connections.",
+      );
     if (
       this.syncing ||
       this.store.proposals(this.mode).some((p) => p.state === "executing") ||

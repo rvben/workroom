@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Terminal, Copy } from "lucide-react";
 import { api } from "./api";
 import type { TerminalRun } from "../shared/terminal";
+import { TOOLS, type AgentId } from "../shared/onboarding";
+import type { Settings } from "../shared/types";
 import type { WorkSession } from "../shared/types";
 export function TerminalWork({
   session,
@@ -10,11 +12,17 @@ export function TerminalWork({
   session: WorkSession;
   mode: string;
 }) {
+  const [selectedAgents, setSelectedAgents] = useState<AgentId[]>([]);
   const [agent, setAgent] = useState(""),
     [runs, setRuns] = useState<TerminalRun[]>([]),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void api<Settings>("/settings")
+      .then((s) => setSelectedAgents(s.agents?.enabled || []))
+      .catch((e) => setError(e.message));
+  }, []);
   async function load() {
     try {
       setRuns(await api(`/work/sessions/${session.id}/terminal`));
@@ -87,20 +95,52 @@ export function TerminalWork({
           onChange={(e) => setAgent(e.target.value)}
         >
           <option value="">Choose an agent</option>
-          <option value="claude">Claude Code · native hooks</option>
+          {selectedAgents.map((id) => (
+            <option key={id} value={id}>
+              {TOOLS.find((t) => t.id === id)!.name} ·{" "}
+              {id === "claude" ? "native hooks" : "manual reporting"}
+            </option>
+          ))}
         </select>
       </label>
       <p className="timeline-caption">
         Codex and Cline can use manual CLI reporting today. Their native
         adapters are not implemented yet.
       </p>
-      {agent && <code className="terminal-command">{command}</code>}
+      {!selectedAgents.length && (
+        <p>
+          Choose your agents in Connections → Guided setup. No agent is selected
+          by default.
+        </p>
+      )}
+      {agent && agent !== "claude" && (
+        <p>
+          {TOOLS.find((t) => t.id === agent)?.name} uses manual reporting. Copy
+          the context command below, then use the claim, report and handoff
+          commands from the agent integration guide. Native capture and managed
+          resume are available for Claude Code.
+        </p>
+      )}
+      {agent && (
+        <code className="terminal-command">
+          {agent === "claude"
+            ? command
+            : `npm run agent -- packet ${session.id}`}
+        </code>
+      )}
       <button
         className="button primary"
         disabled={!agent || blocked}
-        onClick={() => void copy(command)}
+        onClick={() =>
+          void copy(
+            agent === "claude"
+              ? command
+              : `npm run agent -- packet ${session.id}`,
+          )
+        }
       >
-        <Copy size={14} /> Copy start command
+        <Copy size={14} />{" "}
+        {agent === "claude" ? "Copy start command" : "Copy context command"}
       </button>
       {notice && <p role="status">{notice}</p>}
       {error && (
