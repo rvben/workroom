@@ -149,7 +149,13 @@ test("adapter uses explicit JSON and argv arrays, never a shell command", async 
   c.query = 'summary ~ "$(echo nope)"';
   await service.adapter("jira").collect();
   assert.ok(observed.includes(c.query));
-  assert.ok(observed.includes("--json"));
+  assert.deepEqual(
+    observed.slice(
+      observed.indexOf("--output"),
+      observed.indexOf("--output") + 2,
+    ),
+    ["--output", "json"],
+  );
   assert.ok(observed.includes("--limit"));
   store.close();
 });

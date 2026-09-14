@@ -82,11 +82,7 @@ export class Adapter {
       ...(this.config.profile && this.source !== "gitlab"
         ? ["--profile", this.config.profile]
         : []),
-      ...(this.source === "jira"
-        ? ["--json", "--quiet"]
-        : this.source === "gitlab"
-          ? []
-          : ["--output", "json", "--quiet"]),
+      ...(this.source === "gitlab" ? [] : ["--output", "json", "--quiet"]),
       ...args,
     ];
   }
