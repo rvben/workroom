@@ -2,23 +2,34 @@
 
 A local web workspace for Jira tickets, GitLab merge requests, ServiceNow incidents and related Outlook email. The attention inbox and connected detail pane share a SQLite-backed API with your agents.
 
-## Run
+**Preview release:** Workroom is ready to try locally. Live Jira access has been exercised; GitLab, ServiceNow and Outlook still need authenticated end-to-end trials. See the [release notes](docs/releases/0.1.0.md) for the validation boundary.
 
-Requires Node.js 24 or newer.
+## Install and run
+
+Requires Node.js 24 or newer (24 LTS recommended), npm and Git. The supported host environments are macOS and Linux, including WSL. Backend CLIs are optional for exploring the demo.
 
 ```sh
-npm ci
-npm run dev
+git clone --branch v0.1.0 --depth 1 https://github.com/rvben/workroom.git
+cd workroom
+npm ci --include=dev
+npm run build
+npm start
 ```
 
 Open **http://127.0.0.1:4310**. The first launch uses an isolated demo collection with sample records. Notes, snoozes, relationship decisions and proposals persist across restarts.
 
-For a production build on your work machine:
+Alternatively, download `workroom-0.1.0.tar.gz` and `SHA256SUMS` from the [GitHub release](https://github.com/rvben/workroom/releases/tag/v0.1.0). The release archive includes the built frontend:
 
 ```sh
-npm run build
+# macOS; on Linux use: sha256sum -c SHA256SUMS
+shasum -a 256 -c SHA256SUMS
+tar -xzf workroom-0.1.0.tar.gz
+cd workroom-0.1.0
+npm ci --include=dev
 npm start
 ```
+
+Keep `--include=dev`: this version runs TypeScript through `tsx` and loads Vite from the server module. The archive includes no Node runtime, dependencies, backend CLIs, agents or credentials. Nothing is published to npm. For development, clone the default branch, install dependencies and use `npm run dev`.
 
 The server binds to loopback only. Run it under the same OS account and environment as your authenticated CLIs. This first version is a single-user local application, not a remotely hosted multi-user service.
 
@@ -44,7 +55,7 @@ Default collection scopes:
 
 Each fetch is bounded to 100 records (per repository for GitLab). The UI reports when a collection may be incomplete. This is a bounded current-work snapshot, not a full archive; narrow queries as needed. A successful refresh replaces that source's collection; a failed refresh preserves its previous collection. Local notes/snoozes survive an item leaving and re-entering the scope.
 
-Use the actual executable names: the `jira-cli` project installs `jira`, and `outlook-cli` installs `outlook`. CLI source contracts were inspected in `../cli-tools/`. GitLab uses documented `glab mr list/view --output json` calls.
+Use the actual executable names: the [jira-cli](https://github.com/rvben/jira-cli) project installs `jira`, and [outlook-cli](https://github.com/rvben/outlook-cli) installs `outlook`. These are the supported implementations; another tool with the same executable name may have a different command contract. GitLab uses documented `glab mr list/view --output json` calls.
 
 If executable locations differ, copy `workroom.config.example.json` to `workroom.config.json`, set paths, and restart. Omitted fields use defaults. Values in this optional file override saved settings on startup; omit fields that you want managed solely by the UI. Do not put credentials in this file.
 
@@ -111,9 +122,9 @@ npm run check
 
 Build checks TypeScript and creates the production frontend. Tests cover source output formats, relationship evidence, local persistence, failed refresh retention, stale-write prevention and uncertain-action replay protection.
 
-The original comparison remains in `index.html` and `prototypes/` as local design material. It is not served by the production application and must not be committed. The application's entry point is `client/index.html`.
-
 Logo asset origins are recorded in `public/logos/SOURCES.md`.
+
+See [Contributing](CONTRIBUTING.md), [Security](SECURITY.md) and the [release procedure](docs/releasing.md) for public-source checks, private vulnerability reporting and packaging. Workroom is [MIT licensed](LICENSE); bundled third-party code and service marks are covered by [their own notices](THIRD_PARTY_NOTICES.md).
 
 ## Reference contracts
 

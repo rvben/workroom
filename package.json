@@ -2,6 +2,14 @@
   "name": "workroom",
   "version": "0.1.0",
   "private": true,
+  "description": "A local workspace for Jira, GitLab, ServiceNow, Outlook and coding agents.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rvben/workroom.git"
+  },
+  "homepage": "https://github.com/rvben/workroom#readme",
+  "bugs": "https://github.com/rvben/workroom/issues",
   "type": "module",
   "engines": {
     "node": ">=24.0.0"
@@ -12,7 +20,10 @@
     "start": "node --import tsx server/index.ts --production",
     "test": "node --import tsx --test tests/*.test.ts",
     "check": "npm run build && npm test",
-    "agent": "node --import tsx server/cli.ts"
+    "agent": "node --import tsx server/cli.ts",
+    "check:public": "node scripts/check-public.mjs --history",
+    "smoke:release": "node scripts/smoke-release.mjs",
+    "release:prepare": "node scripts/prepare-release.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",

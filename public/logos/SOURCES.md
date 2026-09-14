@@ -1,4 +1,4 @@
-# Local logo assets
+# Service identification assets
 
 Local copies of service identification assets used by the application.
 
@@ -8,3 +8,5 @@ Local copies of service identification assets used by the application.
 - ServiceNow: https://cdn.jsdelivr.net/gh/callback-io/allogo@main/public/logos/servicenow/icon.svg (Allogo)
 
 Downloaded 2026-09-14. Assets retain their supplied geometry and colors. Brand marks identify the corresponding services; Outlook uses the recognizable classic icon supplied by this collection. Served locally with no runtime third-party requests.
+
+The SVG Logos collection is distributed under CC0-1.0. VS Code Icons and Allogo are distributed under MIT. Copyright and license notices are included in [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md). Service names and marks remain the property of their owners; their inclusion does not imply affiliation or endorsement.

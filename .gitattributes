@@ -1,0 +1,15 @@
+* text=auto eol=lf
+
+# Additional protection for source archives; the publication check also rejects these.
+.data export-ignore
+.env* export-ignore
+workroom.config.json export-ignore
+node_modules export-ignore
+dist export-ignore
+prototypes export-ignore
+DESIGN.md export-ignore
+PRODUCT.md export-ignore
+.impeccable export-ignore
+.agents export-ignore
+.codex export-ignore
+/index.html export-ignore

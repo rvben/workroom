@@ -31,3 +31,26 @@ coverage/
 *.key
 # Public integration guide, not a local agent instruction file
 !/docs/agents.md
+
+# Release output, editor state and local authentication
+/release/
+/releases/
+*.tgz
+*.tar.gz
+*.tar
+*.zip
+.idea/
+.vscode/
+.npmrc
+.netrc
+.git-credentials
+.ssh/
+.aws/
+workroom.config.*.json
+!workroom.config.example.json
+*.p12
+*.pfx
+*.har
+*screenshot*
+*visual-qa*
+*prototype-report*
