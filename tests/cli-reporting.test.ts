@@ -110,6 +110,7 @@ test(
         "check",
         "verify/jira",
         "install",
+        "jira/projects",
         "finish",
         "repository/test",
       ]) {

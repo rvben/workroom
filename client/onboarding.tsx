@@ -1,4 +1,6 @@
 import { RepositorySettings } from "./development";
+import { JiraScopePicker } from "./jira-scope";
+import type { JiraProjects } from "../shared/jira-scope";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -641,13 +643,31 @@ export function Onboarding({
                               and team reviews in these projects.
                             </small>
                           </label>
+                        ) : source === "jira" ? (
+                          <JiraScopePicker
+                            key={c.profile + c.executable}
+                            value={c.query}
+                            disabled={isBusy}
+                            onChange={(query) => change(source, "query", query)}
+                            loadProjects={async () => {
+                              setBusy("projects");
+                              try {
+                                const saved = await save(draft);
+                                return await api<JiraProjects>(
+                                  "/setup/jira/projects",
+                                  "POST",
+                                  { version: saved.state.version },
+                                );
+                              } finally {
+                                setBusy("");
+                              }
+                            }}
+                          />
                         ) : (
                           <label>
-                            {source === "jira"
-                              ? "Jira query (JQL)"
-                              : source === "outlook"
-                                ? "Email search (optional)"
-                                : "Incident query (optional)"}
+                            {source === "outlook"
+                              ? "Email search (optional)"
+                              : "Incident query (optional)"}
                             <textarea
                               rows={2}
                               disabled={isBusy}
@@ -656,19 +676,15 @@ export function Onboarding({
                                 change(source, "query", e.target.value)
                               }
                               placeholder={
-                                source === "jira"
-                                  ? "assignee = currentUser() AND statusCategory != Done"
-                                  : source === "outlook"
-                                    ? "Leave empty for recent email"
-                                    : "Leave empty for incidents assigned to you or your groups"
+                                source === "outlook"
+                                  ? "Leave empty for recent email"
+                                  : "Leave empty for incidents assigned to you or your groups"
                               }
                             />
                             <small>
-                              {source === "jira"
-                                ? "Using a test project? Enter project = YOURKEY to include unassigned tickets."
-                                : source === "outlook"
-                                  ? "Email is collected per message; subject matches are suggestions."
-                                  : "The default query includes active incidents for you and your groups."}
+                              {source === "outlook"
+                                ? "Email is collected per message; subject matches are suggestions."
+                                : "The default query includes active incidents for you and your groups."}
                             </small>
                           </label>
                         )}

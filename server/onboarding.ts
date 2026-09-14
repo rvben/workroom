@@ -17,6 +17,7 @@ import { inspectRepository } from "./git.js";
 import { projectParts } from "../shared/mrs.js";
 import { toolRun, type ToolRunner } from "./tool-process.js";
 import { processExists } from "./terminal-sessions.js";
+import type { JiraProjects } from "../shared/jira-scope.js";
 const stateSchema = z
   .object({
     version: z.number().int(),
@@ -217,6 +218,42 @@ export class Onboarding {
     this.checks = checks;
     this.managers = managers;
     return this.overview();
+  }
+  async jiraProjects(version: number): Promise<JiraProjects> {
+    const state = this.state();
+    if (state.version !== version)
+      throw new Error(
+        "Setup changed. Save your current profile before loading projects.",
+      );
+    const adapter = new Adapter(
+      "jira",
+      structuredClone(state.configs.jira),
+      this.connectorRunner,
+    );
+    const user = await adapter.call(["myself"]);
+    if (!user.accountId && !user.name)
+      throw new Error(
+        "Sign in with the selected Jira profile, then load projects again.",
+      );
+    const data = await adapter.call(["projects", "list"]);
+    const rows = z
+      .array(
+        z.object({
+          key: z.string().min(1).max(255),
+          name: z.string().min(1).max(500),
+        }),
+      )
+      .parse(data.projects);
+    if (signature(state.configs.jira) !== signature(this.state().configs.jira))
+      throw new Error(
+        "The Jira profile changed while loading projects. Load them again.",
+      );
+    return {
+      projects: rows.slice(0, 500),
+      limited:
+        rows.length > 500 ||
+        (typeof data.total === "number" && data.total > rows.length),
+    };
   }
   async verify(source: Source) {
     if (this.verifying.has(source))

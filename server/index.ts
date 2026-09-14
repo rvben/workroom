@@ -128,6 +128,11 @@ app.post("/api/setup/state", browserOnly, (req, res) =>
 app.post("/api/setup/check", browserOnly, async (_req, res) =>
   res.json(await onboarding.check()),
 );
+app.post("/api/setup/jira/projects", browserOnly, async (req, res) =>
+  res.json(
+    await onboarding.jiraProjects(z.number().int().parse(req.body.version)),
+  ),
+);
 app.post("/api/setup/verify/:source", browserOnly, async (req, res) =>
   res.json(await onboarding.verify(z.enum(SOURCES).parse(req.params.source))),
 );

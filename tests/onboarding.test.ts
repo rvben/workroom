@@ -327,3 +327,89 @@ test("failed installer diagnostics do not expose output or automatically retry",
     f.store.close();
   }
 });
+
+test("Jira project discovery requires sign-in and returns only picker fields", async () => {
+  const calls: string[][] = [];
+  const f = fixture(tools, async (_exe, args) => {
+    calls.push(args);
+    return args.includes("myself")
+      ? { accountId: "fixture-account" }
+      : {
+          projects: [
+            {
+              key: "TEAM",
+              name: "Team project",
+              id: "private-id",
+              extra: "not for the browser",
+            },
+          ],
+        };
+  });
+  try {
+    assert.deepEqual(await f.setup.jiraProjects(0), {
+      projects: [{ key: "TEAM", name: "Team project" }],
+      limited: false,
+    });
+    assert.deepEqual(
+      calls.map((c) => c.slice(-2)),
+      [
+        ["--quiet", "myself"],
+        ["projects", "list"],
+      ],
+    );
+    assert.equal(f.setup.overview().connections.length, 0);
+    assert.equal(f.service.mode, "demo");
+    await assert.rejects(f.setup.jiraProjects(99), /Setup changed/);
+  } finally {
+    f.store.close();
+  }
+  const anonymous = fixture(tools, async () => ({}));
+  try {
+    await assert.rejects(anonymous.setup.jiraProjects(0), /Sign in/);
+  } finally {
+    anonymous.store.close();
+  }
+});
+test("Jira project discovery rejects a changed profile and bounds large lists", async () => {
+  let release!: (value: unknown) => void;
+  const f = fixture(tools, async (_exe, args) =>
+    args.includes("myself")
+      ? { accountId: "fixture" }
+      : new Promise((resolve) => {
+          release = resolve;
+        }),
+  );
+  try {
+    const loading = f.setup.jiraProjects(0);
+    await new Promise((resolve) => setImmediate(resolve));
+    const state = f.setup.state();
+    f.setup.save({
+      ...state,
+      configs: {
+        ...state.configs,
+        jira: { ...state.configs.jira, profile: "another-profile" },
+      },
+    });
+    release({ projects: [{ key: "OLD", name: "Old account" }] });
+    await assert.rejects(loading, /profile changed/);
+  } finally {
+    f.store.close();
+  }
+  const large = fixture(tools, async (_exe, args) =>
+    args.includes("myself")
+      ? { accountId: "fixture" }
+      : {
+          projects: Array.from({ length: 501 }, (_, i) => ({
+            key: `P${i}`,
+            name: `Project ${i}`,
+          })),
+        },
+  );
+  try {
+    const result = await large.setup.jiraProjects(0);
+    assert.equal(result.projects.length, 500);
+    assert.equal(result.limited, true);
+  } finally {
+    large.store.close();
+  }
+});

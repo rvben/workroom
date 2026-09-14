@@ -657,3 +657,59 @@
     grid-template-columns: 1fr;
   }
 }
+
+.setup-jira-scope {
+  border: 0;
+  padding: 0;
+  margin: 8px 0;
+  min-width: 0;
+}
+.setup-jira-scope legend {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.setup-jira-scope > label {
+  margin-bottom: 10px;
+}
+.setup-config select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font: inherit;
+}
+.setup-scope-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0 14px;
+}
+.setup-scope-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.setup-scope-summary {
+  margin-bottom: 16px;
+  color: var(--green);
+  line-height: 1.6;
+}
+.setup-scope-replace {
+  margin-top: 14px;
+}
+.setup-scope-replace .button {
+  margin: 8px 8px 0 0;
+}
+.setup-jira-scope > textarea {
+  margin-bottom: 12px;
+}
+@media (max-width: 650px) {
+  .setup-scope-fields {
+    grid-template-columns: 1fr;
+  }
+}
