@@ -133,6 +133,12 @@ app.post("/api/setup/jira/projects", browserOnly, async (req, res) =>
     await onboarding.jiraProjects(z.number().int().parse(req.body.version)),
   ),
 );
+app.post("/api/setup/gitlab/projects", browserOnly, async (req, res) =>
+  res.json(await onboarding.gitlabProjects(req.body)),
+);
+app.post("/api/setup/outlook/folders", browserOnly, async (req, res) =>
+  res.json(await onboarding.outlookFolders(req.body)),
+);
 app.post("/api/setup/verify/:source", browserOnly, async (req, res) =>
   res.json(await onboarding.verify(z.enum(SOURCES).parse(req.params.source))),
 );

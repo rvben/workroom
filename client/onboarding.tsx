@@ -1,5 +1,16 @@
 import { RepositorySettings } from "./development";
 import { JiraScopePicker } from "./jira-scope";
+import {
+  GitLabProjectPicker,
+  IncidentScopePicker,
+  OutlookScopePicker,
+} from "./backend-scopes";
+import {
+  initialGitLabUrl,
+  normalizeGitLabHost,
+  type GitLabProjectPage,
+  type MailFolderPage,
+} from "../shared/backend-scopes";
 import type { JiraProjects } from "../shared/jira-scope";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -33,6 +44,7 @@ const steps = [
   "Your agents",
   "Open your workspace",
 ];
+const itemCount = (n: number) => `${n} ${n === 1 ? "item" : "items"}`;
 const quote = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'";
 function Command({ value }: { value: string }) {
   const [copied, setCopied] = useState(false),
@@ -124,10 +136,23 @@ export function Onboarding({
   useEffect(() => {
     let active = true;
     void api<SetupOverview>("/setup")
-      .then((x) => {
+      .then(async (x) => {
         if (active) {
           setInfo(x);
           setDraft(x.state);
+          if (x.state.step === 1 || x.state.step === 2) {
+            setBusy("check");
+            try {
+              const checked = await api<SetupOverview>(
+                "/setup/check",
+                "POST",
+                {},
+              );
+              if (active) setInfo(checked);
+            } finally {
+              if (active) setBusy("");
+            }
+          }
         }
       })
       .catch((e) => setError(e.message));
@@ -286,7 +311,7 @@ export function Onboarding({
           </a>
         </div>
         {status && <p className="setup-muted">{status.detail}</p>}
-        {!available && (
+        {!available && status && (
           <div className="setup-install">
             <p>
               Install <code>{tool.executable}</code> on the machine running
@@ -395,16 +420,29 @@ export function Onboarding({
     if (tool.id === "claude") return "claude auth login";
     if (tool.id === "cline") return "cline auth";
     if (tool.id === "gitlab") {
-      const project = draft!.configs.gitlab.repositories[0] || "";
-      const host =
-        project.split("/").length > 2 ? project.split("/")[0] : "gitlab.com";
-      return "glab auth login --hostname " + quote(host);
+      try {
+        const config = draft!.configs.gitlab;
+        return (
+          "glab auth login --hostname " +
+          quote(
+            normalizeGitLabHost(
+              initialGitLabUrl(config.baseUrl, config.repositories),
+            ),
+          )
+        );
+      } catch {
+        return "";
+      }
     }
-    const profile = draft!.configs[tool.id as Source].profile;
+    const config = draft!.configs[tool.id as Source];
+    const profile = config.profile;
     return [
       tool.executable,
       ...(profile ? ["--profile", quote(profile)] : []),
       tool.id === "outlook" ? "auth login" : "init",
+      ...(tool.id === "servicenow" && config.baseUrl
+        ? ["--instance", quote(config.baseUrl)]
+        : []),
     ].join(" ");
   }
   return (
@@ -596,7 +634,7 @@ export function Onboarding({
                         {expired
                           ? "Recheck connection"
                           : verified?.state === "ready"
-                            ? `${verified.count} items found`
+                            ? `${itemCount(verified.count)} found`
                             : verified?.state === "error"
                               ? "Needs attention"
                               : "Set up connection"}
@@ -623,26 +661,33 @@ export function Onboarding({
                           </label>
                         )}
                         {source === "gitlab" ? (
-                          <label>
-                            GitLab projects
-                            <textarea
-                              disabled={isBusy}
-                              rows={3}
-                              value={c.repositories.join("\n")}
-                              placeholder="gitlab.example.com/team/project"
-                              onChange={(e) =>
-                                change(
-                                  source,
-                                  "repositories",
-                                  e.target.value.split("\n"),
-                                )
+                          <GitLabProjectPicker
+                            url={initialGitLabUrl(c.baseUrl, c.repositories)}
+                            projects={c.repositories}
+                            disabled={isBusy}
+                            onUrl={(url) => change(source, "baseUrl", url)}
+                            onProjects={(projects) =>
+                              change(source, "repositories", projects)
+                            }
+                            load={async (host, search, page) => {
+                              setBusy("projects");
+                              try {
+                                const saved = await save(draft);
+                                return await api<GitLabProjectPage>(
+                                  "/setup/gitlab/projects",
+                                  "POST",
+                                  {
+                                    version: saved.state.version,
+                                    host,
+                                    search,
+                                    page,
+                                  },
+                                );
+                              } finally {
+                                setBusy("");
                               }
-                            />
-                            <small>
-                              One host/group/project per line. Includes your MRs
-                              and team reviews in these projects.
-                            </small>
-                          </label>
+                            }}
+                          />
                         ) : source === "jira" ? (
                           <JiraScopePicker
                             key={c.profile + c.executable}
@@ -663,43 +708,40 @@ export function Onboarding({
                               }
                             }}
                           />
+                        ) : source === "servicenow" ? (
+                          <IncidentScopePicker
+                            value={c.query}
+                            disabled={isBusy}
+                            onChange={(query) => change(source, "query", query)}
+                          />
                         ) : (
-                          <label>
-                            {source === "outlook"
-                              ? "Email search (optional)"
-                              : "Incident query (optional)"}
-                            <textarea
-                              rows={2}
-                              disabled={isBusy}
-                              value={c.query}
-                              onChange={(e) =>
-                                change(source, "query", e.target.value)
+                          <OutlookScopePicker
+                            key={c.profile + c.executable}
+                            query={c.query}
+                            folder={c.folder}
+                            disabled={isBusy}
+                            onQuery={(query) => change(source, "query", query)}
+                            onFolder={(folder) =>
+                              change(source, "folder", folder)
+                            }
+                            load={async (parent, cursor) => {
+                              setBusy("folders");
+                              try {
+                                const saved = await save(draft);
+                                return await api<MailFolderPage>(
+                                  "/setup/outlook/folders",
+                                  "POST",
+                                  {
+                                    version: saved.state.version,
+                                    parent,
+                                    cursor,
+                                  },
+                                );
+                              } finally {
+                                setBusy("");
                               }
-                              placeholder={
-                                source === "outlook"
-                                  ? "Leave empty for recent email"
-                                  : "Leave empty for incidents assigned to you or your groups"
-                              }
-                            />
-                            <small>
-                              {source === "outlook"
-                                ? "Email is collected per message; subject matches are suggestions."
-                                : "The default query includes active incidents for you and your groups."}
-                            </small>
-                          </label>
-                        )}
-                        {source === "outlook" && (
-                          <label>
-                            Mail folder
-                            <input
-                              disabled={isBusy}
-                              value={c.folder}
-                              placeholder="inbox"
-                              onChange={(e) =>
-                                change(source, "folder", e.target.value)
-                              }
-                            />
-                          </label>
+                            }}
+                          />
                         )}
                         {(source === "jira" || source === "servicenow") && (
                           <label>
@@ -720,15 +762,25 @@ export function Onboarding({
                               }
                             />
                             <small>
-                              Used for source links. The CLI profile determines
-                              which account and host are queried.
+                              {source === "servicenow"
+                                ? "Used by the sign-in command and for source links. Verify the connection to confirm your selected profile."
+                                : "Used for source links. The CLI profile determines which account and host are queried."}
                             </small>
                           </label>
                         )}
                       </div>
                       <div className="setup-signin">
                         <h3>Sign in from your terminal</h3>
-                        <Command value={loginCommand(tool)} />
+                        <>
+                          {loginCommand(tool) ? (
+                            <Command value={loginCommand(tool)} />
+                          ) : (
+                            <p className="setup-status warn">
+                              Enter a valid GitLab site URL above to get its
+                              sign-in command.
+                            </p>
+                          )}
+                        </>
                         <p>
                           Run this on the Workroom host. Complete any browser
                           login or token entry in the CLI’s own setup. Then
@@ -952,7 +1004,7 @@ export function Onboarding({
                         <strong>{t.name}</strong>
                         <small>
                           {c
-                            ? `${c.count} items · verified ${new Date(c.checkedAt).toLocaleTimeString()}`
+                            ? `${itemCount(c.count)} · verified ${new Date(c.checkedAt).toLocaleTimeString()}`
                             : expired
                               ? "Verification expired · recheck before enabling this source"
                               : "Saved for later · verify this connection to enable it"}
@@ -977,7 +1029,7 @@ export function Onboarding({
                 </h3>
                 <p>
                   {ready.length
-                    ? `${ready.reduce((n, c) => n + c.count, 0)} items found across ${ready.length} verified ${ready.length === 1 ? "source" : "sources"}. Workroom will refresh these sources when you open the inbox.`
+                    ? `${itemCount(ready.reduce((n, c) => n + c.count, 0))} found across ${ready.length} verified ${ready.length === 1 ? "source" : "sources"}. Workroom will refresh these sources when you open the inbox.`
                     : "Finish later to return to your workspace. Your choices are saved."}
                 </p>
                 <p>

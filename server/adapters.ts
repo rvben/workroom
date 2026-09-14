@@ -1,6 +1,10 @@
 import { projectParts } from "../shared/mrs.js";
 import { execFile } from "node:child_process";
 import { resolveCommand } from "./tool-process.js";
+import {
+  buildIncidentQuery,
+  DEFAULT_INCIDENT_SCOPE,
+} from "../shared/backend-scopes.js";
 import type {
   Source,
   ConnectorConfig,
@@ -111,8 +115,7 @@ export class Adapter {
         "incidents",
         "list",
         "--query",
-        this.config.query ||
-          "active=true^assigned_to=javascript:gs.getUserID()^ORassignment_group=javascript:getMyGroups()^ORDERBYDESCsys_updated_on",
+        this.config.query || buildIncidentQuery(DEFAULT_INCIDENT_SCOPE),
         "--limit",
         "100",
         "--display-value",

@@ -413,3 +413,208 @@ test("Jira project discovery rejects a changed profile and bounds large lists", 
     large.store.close();
   }
 });
+
+test("GitLab discovery authenticates the chosen host, uses GET and keeps only project picker fields", async () => {
+  const calls: string[][] = [];
+  const f = fixture(tools, async (_exe, args) => {
+    calls.push(args);
+    return args[1] === "user"
+      ? { id: 7, email: "not-returned@example.com" }
+      : [
+          {
+            name: "API",
+            name_with_namespace: "Platform / API",
+            path_with_namespace: "platform/api",
+            secret: "not-returned",
+          },
+        ];
+  });
+  try {
+    const result = await f.setup.gitlabProjects({
+      version: 0,
+      host: "https://gitlab.example.com",
+      search: "API & ops",
+      page: 2,
+    });
+    assert.deepEqual(result, {
+      host: "gitlab.example.com",
+      projects: [
+        {
+          name: "Platform / API",
+          path: "platform/api",
+          project: "gitlab.example.com/platform/api",
+        },
+      ],
+      page: 2,
+      more: false,
+    });
+    assert.ok(
+      calls.every(
+        (a) =>
+          a.includes("GET") &&
+          a[a.indexOf("--hostname") + 1] === "gitlab.example.com",
+      ),
+    );
+    const query = new URLSearchParams(calls[1][1].split("?")[1]);
+    assert.equal(query.get("membership"), "true");
+    assert.equal(query.get("search"), "API & ops");
+    assert.equal(query.get("page"), "2");
+    assert.equal(f.setup.overview().connections.length, 0);
+    await assert.rejects(
+      f.setup.gitlabProjects({ version: 42, host: "gitlab.example.com" }),
+      /Setup changed/,
+    );
+    await assert.rejects(
+      f.setup.gitlabProjects({
+        version: 0,
+        host: "https://person:secret@gitlab.example.com",
+      }),
+    );
+    await assert.rejects(
+      f.setup.gitlabProjects({
+        version: 0,
+        host: "gitlab.example.com",
+        method: "POST",
+      }),
+    );
+  } finally {
+    f.store.close();
+  }
+  const anonymous = fixture(tools, async () => ({}));
+  try {
+    await assert.rejects(
+      anonymous.setup.gitlabProjects({
+        version: 0,
+        host: "gitlab.example.com",
+      }),
+      /Sign in/,
+    );
+  } finally {
+    anonymous.store.close();
+  }
+});
+test("GitLab discovery does not return a list from settings changed during loading", async () => {
+  let release!: (v: unknown) => void;
+  const f = fixture(tools, async (_exe, args) =>
+    args[1] === "user"
+      ? { id: 1 }
+      : new Promise((resolve) => {
+          release = resolve;
+        }),
+  );
+  try {
+    const loading = f.setup.gitlabProjects({
+      version: 0,
+      host: "gitlab.example.com",
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    const state = f.setup.state();
+    f.setup.save({
+      ...state,
+      configs: {
+        ...state.configs,
+        gitlab: {
+          ...state.configs.gitlab,
+          baseUrl: "https://another.example.com",
+        },
+      },
+    });
+    release([{ name: "Old project", path_with_namespace: "team/old" }]);
+    await assert.rejects(loading, /settings changed/);
+  } finally {
+    f.store.close();
+  }
+});
+test("Outlook folder browsing supports nested pages and desktop IDs without exposing message data", async () => {
+  const calls: string[][] = [];
+  const folderId = "desktop:" + "a".repeat(800);
+  const f = fixture(tools, async (_exe, args) => {
+    calls.push(args);
+    return {
+      items: [
+        {
+          id: folderId,
+          displayName: "Customer work",
+          childFolderCount: 2,
+          privateField: "not returned",
+        },
+      ],
+      next_cursor: "next-page",
+      truncated: true,
+    };
+  });
+  try {
+    const result = await f.setup.outlookFolders({
+      version: 0,
+      parent: folderId,
+      cursor: "prior-page",
+    });
+    assert.deepEqual(result, {
+      folders: [{ id: folderId, name: "Customer work", children: 2 }],
+      cursor: "next-page",
+      limited: true,
+    });
+    assert.equal(calls[0][calls[0].indexOf("--parent") + 1], folderId);
+    assert.equal(calls[0][calls[0].indexOf("--cursor") + 1], "prior-page");
+    assert.ok(calls[0].includes("folders"));
+    assert.ok(!calls[0].includes("read"));
+    assert.equal(f.setup.overview().connections.length, 0);
+    const state = f.setup.state();
+    f.setup.save({
+      ...state,
+      configs: {
+        ...state.configs,
+        outlook: { ...state.configs.outlook, folder: folderId },
+      },
+    });
+    await assert.rejects(
+      f.setup.outlookFolders({ version: 0 }),
+      /Setup changed/,
+    );
+  } finally {
+    f.store.close();
+  }
+});
+test("Outlook folder browsing rejects old profiles and preserves empty or failed results distinctly", async () => {
+  let release!: (v: unknown) => void;
+  const f = fixture(
+    tools,
+    async () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  );
+  try {
+    const loading = f.setup.outlookFolders({ version: 0 });
+    const state = f.setup.state();
+    f.setup.save({
+      ...state,
+      configs: {
+        ...state.configs,
+        outlook: { ...state.configs.outlook, profile: "another-profile" },
+      },
+    });
+    release({ items: [] });
+    await assert.rejects(loading, /profile or folder changed/);
+  } finally {
+    f.store.close();
+  }
+  const empty = fixture(tools, async () => ({ items: [], next_cursor: null }));
+  try {
+    assert.deepEqual(await empty.setup.outlookFolders({ version: 0 }), {
+      folders: [],
+      cursor: "",
+      limited: false,
+    });
+  } finally {
+    empty.store.close();
+  }
+  const malformed = fixture(tools, async () => ({
+    items: [{ id: "missing-name" }],
+  }));
+  try {
+    await assert.rejects(malformed.setup.outlookFolders({ version: 0 }));
+  } finally {
+    malformed.store.close();
+  }
+});

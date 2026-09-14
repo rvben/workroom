@@ -25,7 +25,7 @@ export const configSchema = z.object({
       "Use an HTTP or HTTPS URL",
     ),
   repositories: z.array(z.string().min(1).max(300)).max(20),
-  folder: z.string().max(300),
+  folder: z.string().max(4000),
 });
 export const developmentSchema = z.object({
   repositories: z

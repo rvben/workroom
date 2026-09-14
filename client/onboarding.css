@@ -713,3 +713,82 @@
     grid-template-columns: 1fr;
   }
 }
+.setup-discovery {
+  margin: 14px 0;
+}
+.setup-discovery-list {
+  max-height: 290px;
+  overflow-y: auto;
+  margin: 10px 0;
+  border-block: 1px solid var(--line);
+}
+.setup-config .setup-project-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 4px;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+}
+.setup-config .setup-project-option input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin-top: 3px;
+  padding: 0;
+  accent-color: var(--green);
+}
+.setup-project-option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.setup-project-option strong {
+  display: block;
+  font-weight: 500;
+}
+.setup-config .setup-project-option small {
+  margin-top: 3px;
+}
+.setup-selected-projects {
+  margin-top: 22px;
+}
+.setup-selected-row,
+.setup-folder-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+}
+.setup-selected-row span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.setup-selected-row .icon-button {
+  flex-shrink: 0;
+}
+.setup-folder-row > .button {
+  text-align: left;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.setup-folder-row > .icon-button {
+  flex-shrink: 0;
+}
+.setup-folder-trail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.setup-folder-trail button {
+  overflow-wrap: anywhere;
+}
+.setup-config .setup-mail-topic {
+  margin-top: 22px;
+}
+.setup-project-entry {
+  margin-block: 16px;
+}
+.setup-project-entry .button {
+  margin-top: 10px;
+}

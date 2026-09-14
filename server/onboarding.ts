@@ -18,6 +18,12 @@ import { projectParts } from "../shared/mrs.js";
 import { toolRun, type ToolRunner } from "./tool-process.js";
 import { processExists } from "./terminal-sessions.js";
 import type { JiraProjects } from "../shared/jira-scope.js";
+import {
+  normalizeGitLabHost,
+  canonicalGitLabProject,
+  type GitLabProjectPage,
+  type MailFolderPage,
+} from "../shared/backend-scopes.js";
 const stateSchema = z
   .object({
     version: z.number().int(),
@@ -253,6 +259,141 @@ export class Onboarding {
       limited:
         rows.length > 500 ||
         (typeof data.total === "number" && data.total > rows.length),
+    };
+  }
+  async gitlabProjects(input: unknown): Promise<GitLabProjectPage> {
+    const x = z
+      .object({
+        version: z.number().int(),
+        host: z.string().min(1).max(255),
+        search: z.string().max(100).default(""),
+        page: z.number().int().min(1).max(100).default(1),
+      })
+      .strict()
+      .parse(input);
+    const state = this.state();
+    if (state.version !== x.version)
+      throw new Error(
+        "Setup changed. Save your GitLab settings before loading projects.",
+      );
+    const host = normalizeGitLabHost(x.host),
+      adapter = new Adapter(
+        "gitlab",
+        structuredClone(state.configs.gitlab),
+        this.connectorRunner,
+      );
+    const user = await adapter.call([
+      "api",
+      "user",
+      "--hostname",
+      host,
+      "--method",
+      "GET",
+    ]);
+    if (!user.id)
+      throw new Error("Sign in to this GitLab host before loading projects.");
+    const query = new URLSearchParams({
+      membership: "true",
+      simple: "true",
+      archived: "false",
+      per_page: "100",
+      page: String(x.page),
+      order_by: "name",
+      sort: "asc",
+    });
+    if (x.search.trim()) query.set("search", x.search.trim());
+    const data = await adapter.call([
+      "api",
+      `projects?${query}`,
+      "--hostname",
+      host,
+      "--method",
+      "GET",
+    ]);
+    const rows = z
+      .array(
+        z.object({
+          path_with_namespace: z.string().min(1).max(300),
+          name_with_namespace: z.string().min(1).max(600).optional(),
+          name: z.string().min(1).max(300),
+        }),
+      )
+      .max(100)
+      .parse(data);
+    if (
+      signature(state.configs.gitlab) !== signature(this.state().configs.gitlab)
+    )
+      throw new Error(
+        "GitLab settings changed while loading projects. Load them again.",
+      );
+    return {
+      host,
+      page: x.page,
+      more: rows.length === 100 && x.page < 100,
+      projects: rows.map((r) => ({
+        project: canonicalGitLabProject(host, r.path_with_namespace),
+        name: r.name_with_namespace || r.name,
+        path: r.path_with_namespace,
+      })),
+    };
+  }
+  async outlookFolders(input: unknown): Promise<MailFolderPage> {
+    const x = z
+      .object({
+        version: z.number().int(),
+        parent: z.string().min(1).max(4000).optional(),
+        cursor: z.string().max(8000).optional(),
+      })
+      .strict()
+      .parse(input);
+    const state = this.state();
+    if (state.version !== x.version)
+      throw new Error(
+        "Setup changed. Save your Outlook profile before loading folders.",
+      );
+    const adapter = new Adapter(
+      "outlook",
+      structuredClone(state.configs.outlook),
+      this.connectorRunner,
+    );
+    const data = await adapter.call([
+      "mail",
+      "folders",
+      "--limit",
+      "100",
+      ...(x.parent ? ["--parent", x.parent] : []),
+      ...(x.cursor ? ["--cursor", x.cursor] : []),
+    ]);
+    const page = z
+      .object({
+        items: z
+          .array(
+            z.object({
+              id: z.string().min(1).max(4000),
+              displayName: z.string().min(1).max(500),
+              childFolderCount: z.number().int().nonnegative().optional(),
+            }),
+          )
+          .max(100),
+        next_cursor: z.string().max(8000).nullish(),
+        truncated: z.boolean().optional(),
+      })
+      .parse(data);
+    if (
+      signature(state.configs.outlook) !==
+      signature(this.state().configs.outlook)
+    )
+      throw new Error(
+        "Outlook profile or folder changed while loading folders. Load them again.",
+      );
+    return {
+      folders: page.items.map((r) => ({
+        id: r.id,
+        name: r.displayName,
+        children: r.childFolderCount || 0,
+      })),
+      cursor: page.next_cursor || "",
+      limited: !!page.truncated,
     };
   }
   async verify(source: Source) {

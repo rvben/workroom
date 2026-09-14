@@ -111,6 +111,8 @@ test(
         "verify/jira",
         "install",
         "jira/projects",
+        "gitlab/projects",
+        "outlook/folders",
         "finish",
         "repository/test",
       ]) {
