@@ -1,0 +1,33 @@
+node_modules/
+dist/
+.data/
+.env
+.env.*
+!.env.example
+workroom.config.json
+*.log
+# Local design study — never commit
+/index.html
+prototypes/
+DESIGN.md
+.impeccable/
+*review*.png
+*screenshot*.png
+
+# Local product/design planning
+/PRODUCT.md
+
+# Machine state, credentials and generated artifacts
+.DS_Store
+.agents/
+.codex/
+.cache/
+coverage/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.pem
+*.key
+# Public integration guide, not a local agent instruction file
+!/docs/agents.md

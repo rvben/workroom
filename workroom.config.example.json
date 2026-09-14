@@ -1,0 +1,29 @@
+{
+  "mode": "live",
+  "refreshMinutes": 5,
+  "connectors": {
+    "jira": {
+      "enabled": true,
+      "executable": "jira",
+      "profile": "work",
+      "query": "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+    },
+    "gitlab": {
+      "enabled": false,
+      "executable": "glab",
+      "repositories": ["gitlab.example.com/platform/payments"]
+    },
+    "servicenow": {
+      "enabled": false,
+      "executable": "servicenow",
+      "profile": "work",
+      "baseUrl": "https://company.service-now.com"
+    },
+    "outlook": {
+      "enabled": false,
+      "executable": "outlook",
+      "profile": "work",
+      "folder": "inbox"
+    }
+  }
+}
