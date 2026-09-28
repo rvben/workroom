@@ -19,6 +19,7 @@ jobs:
       lock: true
       min-age: 7d
       max-bump: minor
+      prepare-command: npm ci
       validation-command: npm run check
       fail-on-blocked: false
       branch: deps/upd
